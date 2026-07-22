@@ -8,7 +8,7 @@
     "children":[],
     "name":"Default",
   },
-  "defaultScriptType":0,
+  "defaultScriptType":1,
   "Folders":[],
   "ForcedPrefabProjectReferences":[],
   "IncludedFiles":[],
@@ -19,7 +19,9 @@
   },
   "name":"Wizardlings",
   "resources":[
+    {"id":{"name":"obj_apprentice","path":"objects/obj_apprentice/obj_apprentice.yy",},},
     {"id":{"name":"Room1","path":"rooms/Room1/Room1.yy",},},
+    {"id":{"name":"spr_apprentice","path":"sprites/spr_apprentice/spr_apprentice.yy",},},
   ],
   "resourceType":"GMProject",
   "resourceVersion":"2.0",

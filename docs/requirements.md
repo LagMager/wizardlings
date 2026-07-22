@@ -27,9 +27,9 @@ This document defines the functional requirements for Wizardlings. Each requirem
 
 | ID | Requirement |
 |----|-------------|
-| MOV-01 | The system shall move all apprentices autonomously via pathfinding without player input. |
+| MOV-01 | The system shall cause apprentices to continuously move autonomously until an interaction changes their behavior. |
 | MOV-02 | The system shall not provide the player with any means to directly control apprentice movement direction, speed, or destination. |
-| MOV-03 | The system shall cause unattended apprentices (those without roles) to walk into hazards and die if no intervention is made. |
+| MOV-03 | Apprentices without appropriate player intervention shall continue moving according to their normal behavior, even if this results in entering hazards. |
 | MOV-04 | The system shall allow multiple apprentices to move simultaneously and independently of one another. |
 
 ---
@@ -52,8 +52,8 @@ This document defines the functional requirements for Wizardlings. Each requirem
 | ID | Requirement |
 |----|-------------|
 | GEO-01 | The system shall allow the Geomancer to reshape terrain in a way that creates passable ground over gaps. |
-| GEO-02 | The system shall allow the Geomancer to build bridges across spike hazards. |
-| GEO-03 | The system shall allow the Geomancer to create terrain that grants access to higher elevations. |
+| GEO-02 | The system shall allow the Geomancer to create traversable terrain over environmental hazards.|
+| GEO-03 | The Geomancer shall reshape terrain to create new traversable paths. |
 | GEO-04 | Terrain created by the Geomancer shall be usable by all apprentices, not only the Geomancer. |
 
 ---
@@ -64,7 +64,7 @@ This document defines the functional requirements for Wizardlings. Each requirem
 |----|-------------|
 | CRY-01 | The system shall allow the Cryomancer to freeze liquid hazards, rendering them traversable. |
 | CRY-02 | The system shall allow the Cryomancer to extinguish flame hazards, neutralizing them. |
-| CRY-03 | The system shall allow the Cryomancer to solidify hazardous terrain, converting it to safe ground. |
+| CRY-03 | The Cryomancer shall temporarily or permanently transform hazardous terrain into traversable terrain. |
 
 ---
 
@@ -86,8 +86,8 @@ This document defines the functional requirements for Wizardlings. Each requirem
 |----|-------------|
 | AER-01 | The system shall allow the Aeromancer to control wind direction. |
 | AER-02 | The system shall allow the Aeromancer's wind to move obstacles. |
-| AER-03 | The system shall allow the Aeromancer's wind to propel moving air platforms. |
-| AER-04 | The system shall allow the Aeromancer to use air powers to cross gaps. |
+| AER-03 | The Aeromancer shall manipulate wind-based environmental elements required for level progression. |
+| AER-04 | The Aeromancer shall enable traversal across otherwise impassable gaps using wind manipulation. |
 
 ---
 
@@ -99,7 +99,7 @@ This document defines the functional requirements for Wizardlings. Each requirem
 | LVL-02 | Each level shall have exactly one exit point that apprentices must reach. |
 | LVL-03 | Each level shall have a designer-defined win threshold (X) specifying the minimum number of apprentices that must reach the exit. |
 | LVL-04 | The system shall present levels as vertical tower sections, with progression moving upward. |
-| LVL-05 | Each level shall be completable through planning and correctly-timed role assignments alone. |
+| LVL-05 | Every level shall be solvable through appropriate role assignment and puzzle planning. |
 
 ---
 
@@ -108,7 +108,7 @@ This document defines the functional requirements for Wizardlings. Each requirem
 | ID | Requirement |
 |----|-------------|
 | WIN-01 | The system shall declare a level won when at least X apprentices reach the exit, where X is the designer-defined threshold for that level. |
-| WIN-02 | The system shall declare a level lost when the number of surviving apprentices drops below X and no surviving apprentice can still reach the exit. |
+| WIN-02 | The system shall declare defeat when the number of living apprentices falls below the required completion threshold.|
 | WIN-03 | The system shall declare a level lost when all apprentices are dead. |
 | WIN-04 | The system shall communicate the win threshold X to the player before or at the start of each level. |
 
