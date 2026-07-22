@@ -1,0 +1,11 @@
+if (!variable_instance_exists(id, "source_hazard")) source_hazard = noone;
+if (!variable_instance_exists(id, "target_x")) target_x = x;
+if (!variable_instance_exists(id, "target_y")) target_y = y - 16;
+if (!variable_instance_exists(id, "move_speed")) move_speed = global.core_config.wind_speed;
+start_x = x;
+start_y = y;
+active = false;
+activation_started = false;
+route_complete = false;
+solid_enabled = false;
+image_speed = 0;

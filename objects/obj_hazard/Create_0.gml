@@ -1,0 +1,10 @@
+hazard_type = HAZARD_TYPE.GAP;
+surface_y = y;
+active = true;
+neutralizer_count = 0;
+geo_resolved = false;
+geo_allowed = true;
+wind_resolved = false;
+cryo_effect = noone;
+cryo_pending = false;
+image_speed = 0;

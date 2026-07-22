@@ -1,0 +1,13 @@
+state = AP_STATE.WALKING;
+role = ROLE.NONE;
+move_sign = 1;
+move_speed = global.core_config.move_speed;
+v_speed = 0;
+h_remainder = 0;
+v_remainder = 0;
+cast_timer = 0;
+cast_target = noone;
+cast_action = CAST_ACTION.NONE;
+contact_hazard = noone;
+terminal_reported = false;
+image_speed = 0;
