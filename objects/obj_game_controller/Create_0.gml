@@ -1,3 +1,22 @@
+// Set game resolution
+window_set_size(320, 180);
+surface_resize(application_surface, 320, 180);
+
+// Camera setup
+cam_base_w = 320;
+cam_base_h = 180;
+cam_x = 0;
+cam_y = 0;
+cam_zoom = 1.0;
+cam_zoom_min = 0.5;  // Zoom in (see less)
+cam_zoom_max = 3.0;  // Zoom out (see more)
+cam_pan_speed = 3;
+
+var _cam = camera_create_view(cam_x, cam_y, cam_base_w, cam_base_h);
+view_set_camera(0, _cam);
+camera_set_view_size(_cam, cam_base_w, cam_base_h);
+camera_set_view_pos(_cam, cam_x, cam_y);
+
 global.core_config = core_default_config();
 global.paused = false;
 global.collision_tilemap = -1;

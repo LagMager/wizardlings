@@ -1,11 +1,49 @@
+// --- Camera Controls ---
+var _cam = view_get_camera(0);
+
+// Pan with arrow keys or WASD
+var _pan_x = 0;
+var _pan_y = 0;
+if (keyboard_check(vk_left) || keyboard_check(ord("A"))) _pan_x -= cam_pan_speed;
+if (keyboard_check(vk_right) || keyboard_check(ord("D"))) _pan_x += cam_pan_speed;
+if (keyboard_check(vk_up) || keyboard_check(ord("W"))) _pan_y -= cam_pan_speed;
+if (keyboard_check(vk_down) || keyboard_check(ord("S"))) _pan_y += cam_pan_speed;
+
+cam_x += _pan_x;
+cam_y += _pan_y;
+
+// Zoom with mouse wheel or +/-
+var _zoom_delta = 0;
+if (mouse_wheel_down() || keyboard_check_pressed(vk_subtract) || keyboard_check_pressed(189)) _zoom_delta = 0.1;
+if (mouse_wheel_up() || keyboard_check_pressed(vk_add) || keyboard_check_pressed(187)) _zoom_delta = -0.1;
+
+cam_zoom = clamp(cam_zoom + _zoom_delta, cam_zoom_min, cam_zoom_max);
+
+// Apply camera position and zoom
+var _view_w = cam_base_w * cam_zoom;
+var _view_h = cam_base_h * cam_zoom;
+
+// Clamp camera to room bounds
+cam_x = clamp(cam_x, 0, max(0, room_width - _view_w));
+cam_y = clamp(cam_y, 0, max(0, room_height - _view_h));
+
+camera_set_view_pos(_cam, cam_x, cam_y);
+camera_set_view_size(_cam, _view_w, _view_h);
+
+// --- Game Logic ---
 if (!counts_initialized) {
     apprentice_count = instance_number(obj_apprentice);
     apprentices_alive = apprentice_count;
     apprentices_exited = 0;
     apprentices_dead = 0;
     counts_initialized = true;
-    core_debug_check("multiple apprentices preplaced", apprentice_count > 1);
-    core_debug_check("designer win threshold is reachable", (win_threshold > 0) && (win_threshold <= apprentice_count));
+    
+    // When using spawn points, apprentices arrive dynamically — skip pre-place checks
+    var _has_spawners = instance_exists(obj_spawn_point);
+    if (!_has_spawners) {
+        core_debug_check("multiple apprentices preplaced", apprentice_count > 1);
+    }
+    core_debug_check("designer win threshold is reachable", (win_threshold > 0) && (_has_spawners || (win_threshold <= apprentice_count)));
 }
 
 if (keyboard_check_pressed(ord("R"))) {
@@ -29,9 +67,17 @@ if (level_state == LEVEL_STATE.PLAYING) {
         global.paused = true;
         show_debug_message("[LEVEL] WON");
     } else if (counts_initialized && ((apprentices_alive + apprentices_exited) < win_threshold)) {
-        level_state = LEVEL_STATE.LOST;
-        global.paused = true;
-        show_debug_message("[LEVEL] LOST");
+        // Only declare defeat if no more spawns are incoming
+        var _spawns_remaining = false;
+        for (var _sp = 0; _sp < instance_number(obj_spawn_point); ++_sp) {
+            var _spawner = instance_find(obj_spawn_point, _sp);
+            if (_spawner.spawning_active) { _spawns_remaining = true; break; }
+        }
+        if (!_spawns_remaining) {
+            level_state = LEVEL_STATE.LOST;
+            global.paused = true;
+            show_debug_message("[LEVEL] LOST");
+        }
     }
 }
 
