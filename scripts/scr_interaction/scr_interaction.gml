@@ -89,6 +89,13 @@ function interaction_check_platform_below(_apprentice) {
 }
 
 
+/// @function interaction_check_exit(_apprentice)
+/// @description Returns the obj_exit instance the apprentice is overlapping, or noone.
+function interaction_check_exit(_apprentice) {
+    return core_exit_touching(_apprentice);
+}
+
+
 /// @function interaction_check_mechanism(_apprentice)
 /// @description Check if an apprentice is touching any mechanism (doors, bridges, etc).
 /// @param {Id.Instance} _apprentice

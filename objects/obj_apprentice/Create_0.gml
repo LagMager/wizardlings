@@ -12,6 +12,16 @@ cast_action = CAST_ACTION.NONE;
 contact_hazard = noone;
 terminal_reported = false;
 
+jump_start_x = 0;
+jump_start_y = 0;
+jump_land_x = 0;
+jump_land_y = 0;
+jump_t = 0;
+jump_duration = 0;
+jump_peak = 0;
+jump_gap = noone;
+gap_jump_target = noone;
+
 // --- Sprite Animation System ---
 // Frame layout: each role variant occupies 16 frames.
 // Within a block: +0 idle, +1..+8 walk, +9 exit, +10 death, +11 cast A, +12 cast B, +13..+15 empty/shield

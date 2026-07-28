@@ -61,6 +61,7 @@ function capability_init(_role) {
         case ROLE.AERO:
             _caps |= CAP.CONTROL_WIND;
             _caps |= CAP.PUSH_OBJECTS;
+            _caps |= CAP.VOIDWALK;
             break;
             
         default:

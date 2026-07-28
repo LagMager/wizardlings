@@ -24,10 +24,7 @@ if (y > room_height + global.core_config.cull_margin) {
     exit;
 }
 
-if (core_exit_touching(id) != noone) {
-    core_notify_terminal(id, AP_STATE.EXITED);
-    exit;
-}
+if (core_try_exit(id)) exit;
 
 switch (state) {
     case AP_STATE.WALKING:
@@ -41,14 +38,20 @@ switch (state) {
 
         var _hazard = core_hazard_ahead(id, global.core_config.detection_distance);
         if (_hazard != noone) {
+            if (capability_has(id, CAP.VOIDWALK) && core_is_gap_hazard(_hazard)
+                && core_gap_can_clear(id, _hazard)
+                && core_gap_ahead_in_range(id, _hazard, global.core_config.detection_distance)) {
+                gap_jump_target = _hazard;
+            } else if (core_is_gap_hazard(_hazard)) {
+                gap_jump_target = noone;
+            }
+
             // --- New typed hazards (obj_hazard_parent children) ---
             if (variable_instance_exists(_hazard, "can_be_countered") && _hazard.hazard_active) {
                 if (_hazard.can_be_countered(id)) {
-                    // Determine cast action based on capability
                     var _cast = CAST_ACTION.NONE;
                     if (capability_has(id, CAP.BUILD_BRIDGE))    _cast = CAST_ACTION.TERRAIN;
                     else if (capability_has(id, CAP.FREEZE_WATER))   _cast = CAST_ACTION.ICE;
-                    else if (capability_has(id, CAP.CONTROL_WIND))   _cast = CAST_ACTION.WIND;
                     else if (capability_has(id, CAP.EXTINGUISH_FIRE)) _cast = CAST_ACTION.ICE;
                     else if (capability_has(id, CAP.SOLIDIFY_TERRAIN)) _cast = CAST_ACTION.ICE;
                     
@@ -69,6 +72,8 @@ switch (state) {
                     exit;
                 }
             }
+        } else if (gap_jump_target != noone) {
+            gap_jump_target = noone;
         }
 
         h_remainder += move_speed * move_sign;
@@ -79,9 +84,17 @@ switch (state) {
                 if (core_apprentice_collides(id, move_sign, 0)) {
                     move_sign *= -1;
                     h_remainder = 0;
+                    gap_jump_target = noone;
                     break;
                 }
                 x += move_sign;
+            }
+        }
+
+        if (instance_exists(gap_jump_target) && core_gap_jumpable(id, gap_jump_target)) {
+            if (core_begin_gap_jump(id, gap_jump_target)) {
+                gap_jump_target = noone;
+                exit;
             }
         }
         break;
@@ -90,30 +103,35 @@ switch (state) {
         cast_timer -= 1;
         if (cast_timer <= 0) core_finish_cast(id);
         break;
+
+    case AP_STATE.GAP_JUMP:
+        core_step_gap_jump(id);
+        break;
 }
 
-v_speed = min(v_speed + global.core_config.gravity, global.core_config.max_fall_speed);
-v_remainder += v_speed;
-var _vertical_pixels = floor(abs(v_remainder));
-if (_vertical_pixels > 0) {
-    var _vertical_sign = sign(v_remainder);
-    v_remainder -= _vertical_pixels * _vertical_sign;
-    repeat (_vertical_pixels) {
-        if (core_apprentice_collides(id, 0, _vertical_sign)) {
-            v_speed = 0;
-            v_remainder = 0;
-            break;
+if (state != AP_STATE.CASTING && state != AP_STATE.GAP_JUMP) {
+    v_speed = min(v_speed + global.core_config.gravity, global.core_config.max_fall_speed);
+    v_remainder += v_speed;
+    var _vertical_pixels = floor(abs(v_remainder));
+    if (_vertical_pixels > 0) {
+        var _vertical_sign = sign(v_remainder);
+        v_remainder -= _vertical_pixels * _vertical_sign;
+        repeat (_vertical_pixels) {
+            if (core_apprentice_collides(id, 0, _vertical_sign)) {
+                v_speed = 0;
+                v_remainder = 0;
+                break;
+            }
+            y += _vertical_sign;
         }
-        y += _vertical_sign;
     }
 }
 
-if (core_exit_touching(id) != noone) {
-    core_notify_terminal(id, AP_STATE.EXITED);
-    exit;
-}
+if (core_try_exit(id)) exit;
 
-core_resolve_hazard_contact(id);
+if (state != AP_STATE.CASTING && state != AP_STATE.GAP_JUMP) {
+    core_resolve_hazard_contact(id);
+}
 
 if (y > room_height + global.core_config.cull_margin) {
     core_notify_terminal(id, AP_STATE.DEAD);

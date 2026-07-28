@@ -18,17 +18,6 @@ on_neutralize = function(_source) {
     is_neutralized = true;
     hazard_active = false;
     
-    // Spawn terrain block over the spikes
     var _width = bbox_right - bbox_left + 1;
-    instance_create_layer(
-        bbox_left,
-        bbox_top,
-        "instances_environment",
-        obj_terrain_block,
-        {
-            block_width: _width,
-            block_height: global.core_config.terrain_height,
-            source_hazard: id
-        }
-    );
+    core_geo_build_bridge(bbox_left, bbox_top, _width, id);
 };

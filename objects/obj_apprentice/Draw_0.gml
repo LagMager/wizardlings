@@ -25,15 +25,25 @@ var _frame = 0;
 
 switch (state) {
     case AP_STATE.WALKING:
-        // Animate walk: cycle through frames +1 to +8
-        anim_frame += anim_speed;
-        if (anim_frame >= 8) anim_frame -= 8;
-        _frame = _offset + 1 + floor(anim_frame);
+        if ((role == ROLE.AERO) && instance_exists(gap_jump_target)) {
+            _frame = _offset + anim_cast_frame;
+        } else {
+            // Animate walk: cycle through frames +1 to +8
+            anim_frame += anim_speed;
+            if (anim_frame >= 8) anim_frame -= 8;
+            _frame = _offset + 1 + floor(anim_frame);
+        }
         break;
         
     case AP_STATE.CASTING:
         // Show cast frame (A or B, chosen at cast start)
         _frame = _offset + anim_cast_frame;
+        break;
+
+    case AP_STATE.GAP_JUMP:
+        anim_frame += anim_speed;
+        if (anim_frame >= 8) anim_frame -= 8;
+        _frame = _offset + 1 + floor(anim_frame);
         break;
         
     case AP_STATE.DEAD:

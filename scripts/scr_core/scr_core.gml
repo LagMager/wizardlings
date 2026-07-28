@@ -1,6 +1,7 @@
 enum AP_STATE {
     WALKING,
     CASTING,
+    GAP_JUMP,
     DEAD,
     EXITED,
     COUNT
@@ -54,6 +55,10 @@ function core_default_config() {
         barrier_hits: 2,
         wind_speed: 1,
         cull_margin: 48,
+        gap_jump_max_width: 96,
+        gap_jump_duration: 28,
+        gap_jump_height: 22,
+        gap_jump_edge_tolerance: 4,
         debug_validation_period: 300
     };
 }
@@ -110,6 +115,133 @@ function core_rect_hits_instances(_left, _top, _right, _bottom) {
 function core_rect_is_solid(_left, _top, _right, _bottom) {
     return core_rect_hits_tilemap(_left, _top, _right, _bottom)
         || core_rect_hits_instances(_left, _top, _right, _bottom);
+}
+
+function core_geo_build_bridge(_left, _top, _width, _source_hazard) {
+    /// Geomancer bridge: visible terrain instance plus collision tile strip aligned to the walk surface.
+    instance_create_layer(
+        _left,
+        _top,
+        "instances_environment",
+        obj_terrain_block,
+        {
+            block_width: _width,
+            block_height: global.core_config.terrain_height,
+            source_hazard: _source_hazard
+        }
+    );
+
+    var _tilemap = global.collision_tilemap;
+    if (_tilemap == -1) return;
+
+    var _tile_size = global.core_config.tile_size;
+    var _start_col = floor(_left / _tile_size);
+    var _end_col = ceil((_left + _width) / _tile_size) - 1;
+    var _row = floor(_top / _tile_size);
+
+    var _fill_tile = tilemap_get(_tilemap, _start_col - 1, _row);
+    if (_fill_tile == 0) _fill_tile = tilemap_get(_tilemap, _end_col + 1, _row);
+    if (_fill_tile == 0) _fill_tile = 1;
+
+    for (var _col = _start_col; _col <= _end_col; _col++) {
+        tilemap_set(_tilemap, _fill_tile, _col, _row);
+    }
+}
+
+function core_is_gap_hazard(_hazard) {
+    if (!instance_exists(_hazard)) return false;
+    if (_hazard.object_index == obj_hazard_gap) return true;
+    if (object_is_ancestor(_hazard.object_index, obj_hazard_gap)) return true;
+    if (variable_instance_exists(_hazard, "hazard_type") && (_hazard.hazard_type == HAZARD_TYPE.GAP)) return true;
+    return false;
+}
+
+function core_gap_can_clear(_apprentice, _gap) {
+    if (!instance_exists(_apprentice) || !instance_exists(_gap)) return false;
+    if (!capability_has(_apprentice, CAP.VOIDWALK)) return false;
+    if (!core_hazard_is_lethal(_gap)) return false;
+
+    var _width = _gap.bbox_right - _gap.bbox_left + 1;
+    return (_width <= global.core_config.gap_jump_max_width);
+}
+
+function core_gap_ahead_in_range(_apprentice, _gap, _distance) {
+    if (!instance_exists(_gap)) return false;
+
+    if (_apprentice.move_sign > 0) {
+        var _dist = _gap.bbox_left - _apprentice.bbox_right;
+        return (_dist >= 0) && (_dist <= _distance);
+    }
+    var _dist_left = _apprentice.bbox_left - _gap.bbox_right;
+    return (_dist_left >= 0) && (_dist_left <= _distance);
+}
+
+function core_gap_at_jump_edge(_apprentice, _gap) {
+    if (!instance_exists(_apprentice) || !instance_exists(_gap)) return false;
+
+    var _edge_tol = global.core_config.gap_jump_edge_tolerance;
+    var _floor_tol = 4;
+    if (abs(_apprentice.bbox_bottom - _gap.bbox_top) > _floor_tol) return false;
+
+    if (_apprentice.move_sign > 0) {
+        return (_apprentice.bbox_right >= _gap.bbox_left - 1)
+            && (_apprentice.bbox_right <= _gap.bbox_left + _edge_tol);
+    }
+    return (_apprentice.bbox_left <= _gap.bbox_right + 1)
+        && (_apprentice.bbox_left >= _gap.bbox_right - _edge_tol);
+}
+
+function core_gap_jumpable(_apprentice, _gap) {
+    if (_apprentice.state != AP_STATE.WALKING) return false;
+    if (!core_apprentice_collides(_apprentice, 0, 1)) return false;
+    if (!core_gap_can_clear(_apprentice, _gap)) return false;
+    return core_gap_at_jump_edge(_apprentice, _gap);
+}
+
+function core_begin_gap_jump(_apprentice, _gap) {
+    if (!core_gap_jumpable(_apprentice, _gap)) return false;
+
+    var _foot_offset = _apprentice.bbox_bottom - _apprentice.y;
+    var _origin_offset = _apprentice.x - _apprentice.bbox_left;
+
+    _apprentice.jump_start_x = _apprentice.x;
+    _apprentice.jump_start_y = _apprentice.y;
+    if (_apprentice.move_sign > 0) {
+        _apprentice.jump_land_x = _gap.bbox_right + 1 + _origin_offset;
+    } else {
+        _apprentice.jump_land_x = _gap.bbox_left - 1 - (_apprentice.bbox_right - _apprentice.x);
+    }
+    _apprentice.jump_land_y = _gap.bbox_top - _foot_offset;
+
+    _apprentice.jump_t = 0;
+    _apprentice.jump_duration = global.core_config.gap_jump_duration;
+    _apprentice.jump_peak = global.core_config.gap_jump_height;
+    _apprentice.jump_gap = _gap;
+    _apprentice.state = AP_STATE.GAP_JUMP;
+    _apprentice.v_speed = 0;
+    _apprentice.v_remainder = 0;
+    _apprentice.h_remainder = 0;
+    return true;
+}
+
+function core_step_gap_jump(_apprentice) {
+    if (_apprentice.state != AP_STATE.GAP_JUMP) return;
+
+    _apprentice.jump_t += 1;
+    var _duration = max(1, _apprentice.jump_duration);
+    var _u = _apprentice.jump_t / _duration;
+
+    if (_u >= 1) {
+        _apprentice.x = _apprentice.jump_land_x;
+        _apprentice.y = _apprentice.jump_land_y;
+        _apprentice.jump_gap = noone;
+        _apprentice.state = AP_STATE.WALKING;
+        return;
+    }
+
+    _apprentice.x = lerp(_apprentice.jump_start_x, _apprentice.jump_land_x, _u);
+    var _base_y = lerp(_apprentice.jump_start_y, _apprentice.jump_land_y, _u);
+    _apprentice.y = _base_y - (_apprentice.jump_peak * sin(pi * _u));
 }
 
 function core_apprentice_collides(_apprentice, _dx, _dy) {
@@ -213,6 +345,64 @@ function core_wind_ahead(_apprentice, _distance) {
     );
 }
 
+function core_find_wind_for_gap(_gap) {
+    if (!instance_exists(_gap)) return noone;
+    if (variable_instance_exists(_gap, "linked_wind") && instance_exists(_gap.linked_wind)) {
+        return _gap.linked_wind;
+    }
+    return collision_rectangle(
+        _gap.bbox_left,
+        _gap.bbox_top - 48,
+        _gap.bbox_right,
+        _gap.bbox_bottom + 64,
+        obj_wind_object,
+        false,
+        true
+    );
+}
+
+function core_wind_resolve_gap(_wind) {
+    if (!instance_exists(_wind)) return;
+
+    var _gap = noone;
+    if (variable_instance_exists(_wind, "source_hazard") && instance_exists(_wind.source_hazard)) {
+        _gap = _wind.source_hazard;
+    }
+    if (_gap == noone) {
+        _gap = collision_rectangle(
+            _wind.bbox_left,
+            _wind.bbox_top,
+            _wind.bbox_right,
+            _wind.bbox_bottom + 32,
+            obj_hazard,
+            false,
+            true
+        );
+    }
+    if (_gap == noone) {
+        _gap = collision_rectangle(
+            _wind.bbox_left,
+            _wind.bbox_top,
+            _wind.bbox_right,
+            _wind.bbox_bottom + 32,
+            obj_hazard_parent,
+            false,
+            true
+        );
+    }
+    if (_gap == noone) return;
+
+    if (variable_instance_exists(_gap, "wind_resolved")) _gap.wind_resolved = true;
+    if (variable_instance_exists(_gap, "hazard_type") && (_gap.hazard_type == HAZARD_TYPE.GAP)) {
+        if (variable_instance_exists(_gap, "is_neutralized")) _gap.is_neutralized = true;
+        if (variable_instance_exists(_gap, "hazard_active")) _gap.hazard_active = false;
+    }
+    if (object_is_ancestor(_gap.object_index, obj_hazard_gap) || (_gap.object_index == obj_hazard_gap)) {
+        _gap.is_neutralized = true;
+        _gap.hazard_active = false;
+    }
+}
+
 function core_hazard_touching(_apprentice) {
     // Check legacy hazards
     var _legacy = collision_rectangle(
@@ -250,6 +440,21 @@ function core_exit_touching(_apprentice) {
     );
 }
 
+function core_try_exit(_apprentice) {
+    if (!instance_exists(_apprentice)) return false;
+    if ((_apprentice.state == AP_STATE.DEAD) || (_apprentice.state == AP_STATE.EXITED)) return false;
+
+    var _exit = core_exit_touching(_apprentice);
+    if (_exit == noone) return false;
+
+    if (core_notify_terminal(_apprentice, AP_STATE.EXITED)) {
+        _exit.exit_saved_count += 1;
+        show_debug_message("[EXIT] Apprentice saved (" + string(_exit.exit_saved_count) + " through this exit)");
+        return true;
+    }
+    return false;
+}
+
 function core_begin_cast(_apprentice, _target, _action) {
     if (!instance_exists(_apprentice)) return false;
     if ((_apprentice.state == AP_STATE.DEAD) || (_apprentice.state == AP_STATE.EXITED)) return false;
@@ -266,6 +471,10 @@ function core_begin_cast(_apprentice, _target, _action) {
 
     if ((_action == CAST_ACTION.WIND) && instance_exists(_target)) {
         _target.activation_started = true;
+        if (_target.object_index == obj_wind_object) {
+            _target.active = true;
+            _target.solid_enabled = true;
+        }
     }
     return true;
 }
@@ -276,8 +485,12 @@ function core_finish_cast(_apprentice) {
     var _action = _apprentice.cast_action;
 
     if (instance_exists(_target)) {
+        if ((_action == CAST_ACTION.WIND) && (_target.object_index == obj_wind_object)) {
+            _target.active = true;
+            _target.solid_enabled = true;
+        }
         // --- New typed hazards: call on_neutralize() directly ---
-        if (variable_instance_exists(_target, "on_neutralize") && variable_instance_exists(_target, "hazard_active")) {
+        else if (variable_instance_exists(_target, "on_neutralize") && variable_instance_exists(_target, "hazard_active")) {
             _target.on_neutralize(_apprentice);
         }
         // --- Legacy obj_hazard handling ---
@@ -287,17 +500,7 @@ function core_finish_cast(_apprentice) {
                     if (!_target.geo_resolved) {
                         _target.geo_resolved = true;
                         var _terrain_width = _target.bbox_right - _target.bbox_left + 1;
-                        instance_create_layer(
-                            _target.bbox_left,
-                            _target.surface_y,
-                            "instances_environment",
-                            obj_terrain_block,
-                            {
-                                block_width: _terrain_width,
-                                block_height: global.core_config.terrain_height,
-                                source_hazard: _target
-                            }
-                        );
+                        core_geo_build_bridge(_target.bbox_left, _target.bbox_top, _terrain_width, _target);
                     }
                     break;
 
@@ -402,6 +605,9 @@ function core_resolve_hazard_contact(_apprentice) {
     var _hazard = core_hazard_touching(_apprentice);
     if (_hazard == noone) {
         _apprentice.contact_hazard = noone;
+        return;
+    }
+    if ((_apprentice.state == AP_STATE.GAP_JUMP) && instance_exists(_apprentice.jump_gap) && (_hazard == _apprentice.jump_gap)) {
         return;
     }
     if (!core_hazard_is_lethal(_hazard)) return;
@@ -516,7 +722,7 @@ function core_run_boot_checks() {
     var _solid = tilemap_get_at_pixel(global.collision_tilemap, 80, 448);
     core_debug_check("solid tile reports data", (_solid != 0) && (_solid != -1));
     core_debug_check("invalid tilemap handle rejected", !core_tile_is_solid(-1, 80, 448));
-    core_debug_check("state enum contract", (AP_STATE.WALKING == 0) && (AP_STATE.COUNT == 4));
+    core_debug_check("state enum contract", (AP_STATE.WALKING == 0) && (AP_STATE.COUNT == 5));
     core_debug_check("exactly four assignable roles", (ROLE.COUNT - 1) == 4);
     core_debug_check("five hazard categories", HAZARD_TYPE.COUNT == 5);
     core_debug_check("movement config valid", (global.core_config.move_speed > 0) && (global.core_config.gravity > 0));
