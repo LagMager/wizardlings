@@ -1,5 +1,23 @@
-if (global.paused) exit;
-if ((state == AP_STATE.DEAD) || (state == AP_STATE.EXITED)) exit;
+if (variable_global_exists("paused") && global.paused) {
+    // Still animate death bounce while paused (visual only)
+    if (death_bounce_active) {
+        death_bounce_vy += death_bounce_gravity;
+        y += death_bounce_vy;
+        death_timer += 1;
+        if (death_timer > 120) visible = false;
+    }
+    exit;
+}
+if ((state == AP_STATE.DEAD) || (state == AP_STATE.EXITED)) {
+    // Death bounce animation
+    if (death_bounce_active) {
+        death_bounce_vy += death_bounce_gravity;
+        y += death_bounce_vy;
+        death_timer += 1;
+        if (death_timer > 120) visible = false;
+    }
+    exit;
+}
 
 if (y > room_height + global.core_config.cull_margin) {
     core_notify_terminal(id, AP_STATE.DEAD);
@@ -22,14 +40,34 @@ switch (state) {
         }
 
         var _hazard = core_hazard_ahead(id, global.core_config.detection_distance);
-        if ((_hazard != noone) && core_hazard_is_lethal(_hazard)) {
-            if ((role == ROLE.GEO) && _hazard.geo_allowed && core_role_counters_hazard(role, _hazard.hazard_type)) {
-                core_begin_cast(id, _hazard, CAST_ACTION.TERRAIN);
-                exit;
+        if (_hazard != noone) {
+            // --- New typed hazards (obj_hazard_parent children) ---
+            if (variable_instance_exists(_hazard, "can_be_countered") && _hazard.hazard_active) {
+                if (_hazard.can_be_countered(id)) {
+                    // Determine cast action based on capability
+                    var _cast = CAST_ACTION.NONE;
+                    if (capability_has(id, CAP.BUILD_BRIDGE))    _cast = CAST_ACTION.TERRAIN;
+                    else if (capability_has(id, CAP.FREEZE_WATER))   _cast = CAST_ACTION.ICE;
+                    else if (capability_has(id, CAP.CONTROL_WIND))   _cast = CAST_ACTION.WIND;
+                    else if (capability_has(id, CAP.EXTINGUISH_FIRE)) _cast = CAST_ACTION.ICE;
+                    else if (capability_has(id, CAP.SOLIDIFY_TERRAIN)) _cast = CAST_ACTION.ICE;
+                    
+                    if (_cast != CAST_ACTION.NONE) {
+                        core_begin_cast(id, _hazard, _cast);
+                        exit;
+                    }
+                }
             }
-            if ((role == ROLE.CRYO) && core_role_counters_hazard(role, _hazard.hazard_type)) {
-                core_begin_cast(id, _hazard, CAST_ACTION.ICE);
-                exit;
+            // --- Legacy obj_hazard support ---
+            else if (variable_instance_exists(_hazard, "hazard_type") && core_hazard_is_lethal(_hazard)) {
+                if ((role == ROLE.GEO) && _hazard.geo_allowed && core_role_counters_hazard(role, _hazard.hazard_type)) {
+                    core_begin_cast(id, _hazard, CAST_ACTION.TERRAIN);
+                    exit;
+                }
+                if ((role == ROLE.CRYO) && core_role_counters_hazard(role, _hazard.hazard_type)) {
+                    core_begin_cast(id, _hazard, CAST_ACTION.ICE);
+                    exit;
+                }
             }
         }
 

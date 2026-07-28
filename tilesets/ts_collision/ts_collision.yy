@@ -14,8 +14,8 @@
   "resourceType":"GMTileSet",
   "resourceVersion":"2.0",
   "spriteId":{
-    "name":"spr_apprentice",
-    "path":"sprites/spr_apprentice/spr_apprentice.yy",
+    "name":"Sprite3",
+    "path":"sprites/Sprite3/Sprite3.yy",
   },
   "spriteNoExport":false,
   "textureGroupId":{

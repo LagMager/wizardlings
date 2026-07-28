@@ -1,5 +1,4 @@
 // --- Camera Controls ---
-var _cam = view_get_camera(0);
 
 // Pan with arrow keys or WASD
 var _pan_x = 0;
@@ -12,23 +11,17 @@ if (keyboard_check(vk_down) || keyboard_check(ord("S"))) _pan_y += cam_pan_speed
 cam_x += _pan_x;
 cam_y += _pan_y;
 
-// Zoom with mouse wheel or +/-
-var _zoom_delta = 0;
-if (mouse_wheel_down() || keyboard_check_pressed(vk_subtract) || keyboard_check_pressed(189)) _zoom_delta = 0.1;
-if (mouse_wheel_up() || keyboard_check_pressed(vk_add) || keyboard_check_pressed(187)) _zoom_delta = -0.1;
+// Zoom with mouse wheel or +/- keys
+var _zoom_step = 0.25;  // Step size per input (use multiples of quantum for crispness)
+if (mouse_wheel_down() || keyboard_check_pressed(vk_subtract) || keyboard_check_pressed(189)) {
+    camera_zoom_out(_zoom_step);
+}
+if (mouse_wheel_up() || keyboard_check_pressed(vk_add) || keyboard_check_pressed(187)) {
+    camera_zoom_in(_zoom_step);
+}
 
-cam_zoom = clamp(cam_zoom + _zoom_delta, cam_zoom_min, cam_zoom_max);
-
-// Apply camera position and zoom
-var _view_w = cam_base_w * cam_zoom;
-var _view_h = cam_base_h * cam_zoom;
-
-// Clamp camera to room bounds
-cam_x = clamp(cam_x, 0, max(0, room_width - _view_w));
-cam_y = clamp(cam_y, 0, max(0, room_height - _view_h));
-
-camera_set_view_pos(_cam, cam_x, cam_y);
-camera_set_view_size(_cam, _view_w, _view_h);
+// Run the pixel-perfect camera update (lerp, snap, apply)
+camera_update();
 
 // --- Game Logic ---
 if (!counts_initialized) {
@@ -46,21 +39,12 @@ if (!counts_initialized) {
     core_debug_check("designer win threshold is reachable", (win_threshold > 0) && (_has_spawners || (win_threshold <= apprentice_count)));
 }
 
-if (keyboard_check_pressed(ord("R"))) {
+if (keyboard_check_pressed(ord("R")) && !instance_exists(obj_ui_controller)) {
     room_restart();
     exit;
 }
 
 if (level_state == LEVEL_STATE.PLAYING) {
-    if (keyboard_check_pressed(ord("P"))) {
-        global.paused = !global.paused;
-    }
-
-    if (global.paused && (selected_role != ROLE.NONE) && mouse_check_button_pressed(mb_left)) {
-        var _target = instance_position(mouse_x, mouse_y, obj_apprentice);
-        if (_target != noone) core_assign_role(id, _target, selected_role);
-    }
-
     // Victory resolves before defeat when terminal events share a frame.
     if (apprentices_exited >= win_threshold) {
         level_state = LEVEL_STATE.WON;

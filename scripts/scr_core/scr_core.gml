@@ -130,6 +130,13 @@ function core_apprentice_collides(_apprentice, _dx, _dy) {
 
 function core_hazard_is_lethal(_hazard) {
     if (!instance_exists(_hazard)) return false;
+    
+    // New typed hazards (obj_hazard_parent children) use hazard_active
+    if (variable_instance_exists(_hazard, "hazard_active")) {
+        return _hazard.hazard_active;
+    }
+    
+    // Legacy obj_hazard
     return _hazard.active
         && (_hazard.neutralizer_count <= 0)
         && !_hazard.geo_resolved
@@ -160,12 +167,26 @@ function core_hazard_ahead(_apprentice, _distance) {
         _right = _apprentice.bbox_left - 1;
         _left = _right - _distance;
     }
-    return collision_rectangle(
+    
+    // Check legacy obj_hazard first
+    var _legacy = collision_rectangle(
         _left,
         _apprentice.bbox_top - 8,
         _right,
         _apprentice.bbox_bottom + 64,
         obj_hazard,
+        false,
+        true
+    );
+    if (_legacy != noone) return _legacy;
+    
+    // Check new typed hazards (obj_hazard_parent and all children)
+    return collision_rectangle(
+        _left,
+        _apprentice.bbox_top - 8,
+        _right,
+        _apprentice.bbox_bottom + 64,
+        obj_hazard_parent,
         false,
         true
     );
@@ -193,12 +214,25 @@ function core_wind_ahead(_apprentice, _distance) {
 }
 
 function core_hazard_touching(_apprentice) {
-    return collision_rectangle(
+    // Check legacy hazards
+    var _legacy = collision_rectangle(
         _apprentice.bbox_left,
         _apprentice.bbox_top,
         _apprentice.bbox_right,
         _apprentice.bbox_bottom,
         obj_hazard,
+        false,
+        true
+    );
+    if (_legacy != noone) return _legacy;
+    
+    // Check new typed hazards
+    return collision_rectangle(
+        _apprentice.bbox_left,
+        _apprentice.bbox_top,
+        _apprentice.bbox_right,
+        _apprentice.bbox_bottom,
+        obj_hazard_parent,
         false,
         true
     );
@@ -226,6 +260,9 @@ function core_begin_cast(_apprentice, _target, _action) {
     _apprentice.cast_action = _action;
     _apprentice.cast_timer = global.core_config.cast_duration;
     _apprentice.h_remainder = 0;
+    
+    // Pick cast animation frame: 60% Cast A, 40% Cast B
+    _apprentice.anim_cast_frame = (random(1) < 0.4) ? 12 : 11;
 
     if ((_action == CAST_ACTION.WIND) && instance_exists(_target)) {
         _target.activation_started = true;
@@ -239,47 +276,54 @@ function core_finish_cast(_apprentice) {
     var _action = _apprentice.cast_action;
 
     if (instance_exists(_target)) {
-        switch (_action) {
-            case CAST_ACTION.TERRAIN:
-                if (!_target.geo_resolved) {
-                    _target.geo_resolved = true;
-                    var _terrain_width = _target.bbox_right - _target.bbox_left + 1;
-                    instance_create_layer(
-                        _target.bbox_left,
-                        _target.surface_y,
-                        "instances_environment",
-                        obj_terrain_block,
-                        {
-                            block_width: _terrain_width,
-                            block_height: global.core_config.terrain_height,
-                            source_hazard: _target
-                        }
-                    );
-                }
-                break;
+        // --- New typed hazards: call on_neutralize() directly ---
+        if (variable_instance_exists(_target, "on_neutralize") && variable_instance_exists(_target, "hazard_active")) {
+            _target.on_neutralize(_apprentice);
+        }
+        // --- Legacy obj_hazard handling ---
+        else {
+            switch (_action) {
+                case CAST_ACTION.TERRAIN:
+                    if (!_target.geo_resolved) {
+                        _target.geo_resolved = true;
+                        var _terrain_width = _target.bbox_right - _target.bbox_left + 1;
+                        instance_create_layer(
+                            _target.bbox_left,
+                            _target.surface_y,
+                            "instances_environment",
+                            obj_terrain_block,
+                            {
+                                block_width: _terrain_width,
+                                block_height: global.core_config.terrain_height,
+                                source_hazard: _target
+                            }
+                        );
+                    }
+                    break;
 
-            case CAST_ACTION.ICE:
-                if ((_target.cryo_effect == noone) || !instance_exists(_target.cryo_effect)) {
-                    _target.cryo_pending = true;
-                    var _ice_width = _target.bbox_right - _target.bbox_left + 1;
-                    instance_create_layer(
-                        _target.bbox_left,
-                        _target.surface_y,
-                        "instances_environment",
-                        obj_ice_platform,
-                        {
-                            platform_width: _ice_width,
-                            platform_height: global.core_config.terrain_height,
-                            source_hazard: _target,
-                            lifetime: global.core_config.ice_lifetime
-                        }
-                    );
-                }
-                break;
+                case CAST_ACTION.ICE:
+                    if ((_target.cryo_effect == noone) || !instance_exists(_target.cryo_effect)) {
+                        _target.cryo_pending = true;
+                        var _ice_width = _target.bbox_right - _target.bbox_left + 1;
+                        instance_create_layer(
+                            _target.bbox_left,
+                            _target.surface_y,
+                            "instances_environment",
+                            obj_ice_platform,
+                            {
+                                platform_width: _ice_width,
+                                platform_height: global.core_config.terrain_height,
+                                source_hazard: _target,
+                                lifetime: global.core_config.ice_lifetime
+                            }
+                        );
+                    }
+                    break;
 
-            case CAST_ACTION.WIND:
-                _target.active = true;
-                break;
+                case CAST_ACTION.WIND:
+                    _target.active = true;
+                    break;
+            }
         }
     }
 
@@ -318,14 +362,21 @@ function core_notify_terminal(_apprentice, _new_state) {
     if (_new_state == AP_STATE.EXITED) {
         _apprentice.visible = false;
     } else {
-        _apprentice.image_blend = c_red;
+        // Mario-style death bounce — pop up then fall off screen
+        _apprentice.death_bounce_active = true;
+        _apprentice.death_bounce_vy = -3.5;
+        _apprentice.death_timer = 0;
     }
     return true;
 }
 
 function core_try_absorb_hazard(_apprentice, _hazard) {
     if (!instance_exists(_hazard)) return false;
-    if (_hazard.hazard_type == HAZARD_TYPE.GAP) return false;
+    
+    // Gaps can't be absorbed by barriers (no floor = no protection)
+    if (variable_instance_exists(_hazard, "hazard_type") && _hazard.hazard_type == HAZARD_TYPE.GAP) return false;
+    // New typed gap hazards also can't be absorbed
+    if (object_is_ancestor(_hazard.object_index, obj_hazard_gap) || _hazard.object_index == obj_hazard_gap) return false;
 
     var _cx = (_apprentice.bbox_left + _apprentice.bbox_right) * 0.5;
     var _cy = (_apprentice.bbox_top + _apprentice.bbox_bottom) * 0.5;
@@ -372,6 +423,7 @@ function core_assign_role(_controller, _apprentice, _role) {
     if (_controller.limited_budget && (_controller.role_budget[_role] <= 0)) return false;
 
     _apprentice.role = _role;
+    _apprentice.capabilities = capability_init(_role);
     if (_controller.limited_budget) _controller.role_budget[_role] -= 1;
 
     if (_role == ROLE.AEGI) {
@@ -391,10 +443,42 @@ function core_assign_role(_controller, _apprentice, _role) {
 }
 
 function core_setup_collision_tilemap() {
+    /// Collision tilemap setup:
+    ///
+    /// The function searches for a tile layer that uses the ts_collision tileset.
+    /// This means you can name the layer anything — as long as it uses ts_collision,
+    /// it will be found and used as the collision map.
+    ///
+    /// DESIGNER WORKFLOW:
+    ///   1. Create a tile layer in your room (any name works, but "tiles_collision" is conventional).
+    ///   2. Assign the ts_collision tileset to it.
+    ///   3. Paint solid tiles. Any non-zero tile = solid.
+    ///   4. The layer will be hidden at runtime automatically.
+    
     var _config = global.core_config;
+    
+    // --- Search all layers for one using ts_collision ---
+    var _layer_count = layer_get_all();
+    for (var _i = 0; _i < array_length(_layer_count); _i++) {
+        var _layer = _layer_count[_i];
+        var _tilemap = layer_tilemap_get_id(_layer);
+        if (_tilemap != -1) {
+            if (tilemap_get_tileset(_tilemap) == ts_collision) {
+                layer_set_visible(_layer, false);
+                global.collision_tilemap = _tilemap;
+                show_debug_message("[COLLISION] Found painted collision tilemap on layer: " + layer_get_name(_layer));
+                return _tilemap;
+            }
+        }
+    }
+    
+    // --- FALLBACK: Legacy hardcoded collision for Room1 ---
+    // Only runs if no ts_collision tilemap was found in the room.
+    show_debug_message("[COLLISION] No painted ts_collision layer found — using legacy fallback");
+    
     var _layer = layer_get_id("tiles_collision");
     if (_layer == -1) _layer = layer_create(500, "tiles_collision");
-
+    
     var _columns = ceil(room_width / _config.tile_size);
     var _rows = ceil(room_height / _config.tile_size);
     var _tilemap = layer_tilemap_create(_layer, 0, 0, ts_collision, _columns, _rows);

@@ -1,7 +1,7 @@
 /// @description Spawn apprentices on interval
 
 if (!spawning_active) exit;
-if (global.paused) exit;
+if (variable_global_exists("paused") && global.paused) exit;
 if (spawn_count >= spawn_total) {
     spawning_active = false;
     exit;

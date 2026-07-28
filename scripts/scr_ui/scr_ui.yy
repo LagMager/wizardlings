@@ -1,0 +1,10 @@
+{
+  "$GMScript":"v1",
+  "%Name":"scr_ui",
+  "isCompatibility":false,
+  "isDnD":false,
+  "name":"scr_ui",
+  "parent":{"name":"Wizardlings","path":"Wizardlings.yyp",},
+  "resourceType":"GMScript",
+  "resourceVersion":"2.0",
+}

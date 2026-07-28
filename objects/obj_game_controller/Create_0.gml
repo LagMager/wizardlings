@@ -1,25 +1,28 @@
 // Set game resolution
 window_set_size(320, 180);
-surface_resize(application_surface, 320, 180);
 
-// Camera setup
-cam_base_w = 320;
-cam_base_h = 180;
-cam_x = 0;
-cam_y = 0;
-cam_zoom = 1.0;
-cam_zoom_min = 0.5;  // Zoom in (see less)
-cam_zoom_max = 3.0;  // Zoom out (see more)
-cam_pan_speed = 3;
+// --- Pixel-Perfect Camera Configuration ---
+cam_base_w = 320;           // Base resolution width (native "1x" view)
+cam_base_h = 180;           // Base resolution height
+cam_x = 0;                  // Camera world position X
+cam_y = 0;                  // Camera world position Y
+cam_zoom = 1.0;             // Start at native resolution (320x180)
+cam_zoom_min = 0.5;         // Most zoomed-in (see half the base area — 160x90)
+cam_zoom_max = 1.0;         // Cannot zoom out beyond native 320x180
+target_zoom = 1.0;          // Start at native — gameplay code can zoom in from here
+cam_zoom_speed = 0.1;       // Lerp speed (0.1 = smooth, 1.0 = instant)
+cam_pan_speed = 3;          // Pixels per frame for keyboard panning
+cam_snap_to_pixel = true;   // Round camera position to whole pixels
 
-var _cam = camera_create_view(cam_x, cam_y, cam_base_w, cam_base_h);
-view_set_camera(0, _cam);
-camera_set_view_size(_cam, cam_base_w, cam_base_h);
-camera_set_view_pos(_cam, cam_x, cam_y);
+// Initialize the pixel-perfect camera (disables filtering, creates view, resizes surface)
+camera_init();
 
 global.core_config = core_default_config();
 global.paused = false;
 global.collision_tilemap = -1;
+
+// Initialize the signal system for interactable→mechanism communication
+signal_system_init();
 
 level_state = LEVEL_STATE.PLAYING;
 selected_role = ROLE.NONE;

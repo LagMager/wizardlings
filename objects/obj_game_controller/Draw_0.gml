@@ -18,7 +18,4 @@ for (var _j = 0; _j < array_length(_segments); ++_j) {
     draw_rectangle(_segments[_j][0], 440, _segments[_j][1] - 1, 443, false);
 }
 
-draw_set_colour(make_colour_rgb(37, 42, 63));
-for (var _x = 0; _x < room_width; _x += 32) draw_line(_x, 64, _x, 440);
-for (var _y = 64; _y < 440; _y += 32) draw_line(0, _y, room_width, _y);
 draw_set_colour(c_white);
