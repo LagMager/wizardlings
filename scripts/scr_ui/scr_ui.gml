@@ -17,6 +17,49 @@ enum UI_STATE {
     COUNT
 }
 
+/// @function ui_ensure_gui_size()
+/// @description Re-apply 320×180 GUI space (camera/surface changes can desync it).
+function ui_ensure_gui_size() {
+    display_set_gui_size(320, 180);
+}
+
+/// @function ui_role_bar_layout()
+function ui_role_bar_layout() {
+    return {
+        bar_x: 4,
+        bar_y: 2,
+        btn_w: 36,
+        btn_h: 12,
+        btn_gap: 2
+    };
+}
+
+/// @function ui_role_at_gui_point(_mx, _my)
+function ui_role_at_gui_point(_mx, _my) {
+    var _l = ui_role_bar_layout();
+    for (var _role = ROLE.GEO; _role <= ROLE.AERO; ++_role) {
+        var _index = _role - ROLE.GEO;
+        var _bx = _l.bar_x + (_index * (_l.btn_w + _l.btn_gap));
+        if (point_in_rectangle(_mx, _my, _bx, _l.bar_y, _bx + _l.btn_w, _l.bar_y + _l.btn_h)) {
+            return _role;
+        }
+    }
+    return ROLE.NONE;
+}
+
+/// @function ui_cancel_role_assignment(_controller)
+function ui_cancel_role_assignment(_controller) {
+    if (!instance_exists(_controller)) return;
+    _controller.selected_role = ROLE.NONE;
+    global.paused = false;
+}
+
+/// @function ui_start_level()
+function ui_start_level() {
+    global.level_started = true;
+    global.paused = false;
+}
+
 // Role tooltip descriptions
 function ui_get_role_tooltip(_role) {
     switch (_role) {

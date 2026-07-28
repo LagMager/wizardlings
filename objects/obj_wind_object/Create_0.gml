@@ -1,3 +1,4 @@
+/// Platform size = room instance scaleX/scaleY (16×16 Sprite4 base). Nothing here resets scale.
 if (!variable_instance_exists(id, "source_hazard")) source_hazard = noone;
 if (!variable_instance_exists(id, "target_x")) target_x = x;
 if (!variable_instance_exists(id, "target_y")) target_y = y - 16;

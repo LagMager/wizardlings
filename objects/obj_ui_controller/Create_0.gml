@@ -15,9 +15,6 @@
 // Lock GUI to game resolution for clean pixel scaling
 display_set_gui_size(320, 180);
 
-// Set the game font for all UI text
-draw_set_font(Font1);
-
 // UI state
 ui_state = UI_STATE.GAMEPLAY;
 

@@ -1,6 +1,7 @@
 /// @description Spawn apprentices on interval
 
 if (!spawning_active) exit;
+if (!variable_global_exists("level_started") || !global.level_started) exit;
 if (variable_global_exists("paused") && global.paused) exit;
 if (spawn_count >= spawn_total) {
     spawning_active = false;
@@ -14,6 +15,7 @@ if (spawn_timer >= spawn_interval) {
     
     var _apprentice = instance_create_layer(x, y, spawn_layer, obj_apprentice);
     _apprentice.move_sign = spawn_direction;
+    core_apprentice_set_facing(_apprentice, spawn_direction);
     
     spawn_count += 1;
     

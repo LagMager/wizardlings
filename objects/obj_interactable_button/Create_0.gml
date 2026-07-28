@@ -14,3 +14,5 @@
 event_inherited();
 
 one_shot = true;  // Only triggers once
+image_speed = 0;
+image_index = 0;

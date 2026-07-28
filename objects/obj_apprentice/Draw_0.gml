@@ -45,6 +45,12 @@ switch (state) {
         if (anim_frame >= 8) anim_frame -= 8;
         _frame = _offset + 1 + floor(anim_frame);
         break;
+
+    case AP_STATE.CLIMBING:
+        anim_frame += anim_speed;
+        if (anim_frame >= 8) anim_frame -= 8;
+        _frame = _offset + 1 + floor(anim_frame);
+        break;
         
     case AP_STATE.DEAD:
         _frame = _offset + 10;
@@ -55,16 +61,5 @@ switch (state) {
         break;
 }
 
-// --- Flip based on move direction ---
-var _scaleX = (move_sign < 0) ? -1 : 1;
-
-// --- Draw the sprite ---
-draw_sprite_ext(
-    sprite_index,
-    _frame,
-    x, y,
-    _scaleX, 1,
-    0,
-    c_white,
-    1
-);
+// draw_sprite ignores image_xscale — use draw_sprite_ext so facing flips at the feet origin.
+draw_sprite_ext(sprite_index, _frame, x, y, image_xscale, image_yscale, 0, c_white, 1);

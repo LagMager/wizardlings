@@ -87,6 +87,185 @@ function movement_check_fall_death(_entity, _margin) {
 }
 
 
+/// @function platform_sync_size_from_room()
+/// @description Apply room-editor scaleX/scaleY to platform_width/height and sprite mask.
+function platform_sync_size_from_room() {
+    if (sprite_index == -1) return;
+    var _sw = sprite_get_width(sprite_index);
+    var _sh = sprite_get_height(sprite_index);
+    if (_sw <= 0 || _sh <= 0) return;
+
+    if (!variable_instance_exists(id, "platform_width") || platform_width <= 0) {
+        platform_width = _sw * abs(image_xscale);
+    }
+    if (!variable_instance_exists(id, "platform_height") || platform_height <= 0) {
+        platform_height = _sh * abs(image_yscale);
+    }
+    image_xscale = platform_width / _sw;
+    image_yscale = platform_height / _sh;
+}
+
+
+/// @function platform_apply_size(_width, _height)
+function platform_apply_size(_width, _height) {
+    platform_width = _width;
+    platform_height = _height;
+    if (sprite_index == -1) return;
+    image_xscale = _width / sprite_get_width(sprite_index);
+    image_yscale = _height / sprite_get_height(sprite_index);
+}
+
+
+/// @function platform_draw(_offset_x)
+/// @description Stretch spr_platform to platform_width × platform_height (crisp pixels).
+function platform_draw(_offset_x) {
+    if (sprite_index == -1) return;
+    if (is_undefined(_offset_x)) _offset_x = 0;
+
+    var _w = round(platform_width);
+    var _h = round(platform_height);
+    if (_w <= 0) _w = round(sprite_get_width(sprite_index) * abs(image_xscale));
+    if (_h <= 0) _h = round(sprite_get_height(sprite_index) * abs(image_yscale));
+
+    draw_sprite_stretched(sprite_index, 0, x + _offset_x, y, _w, _h);
+}
+
+
+/// @function platform_v_finalize_config(_platform)
+/// @description Apply travel range. Prefer platform_travel_px (Instance Creation Code).
+function platform_v_finalize_config(_platform) {
+    if (!instance_exists(_platform)) return;
+
+    if (!variable_instance_exists(_platform, "bottom_y_anchor")) {
+        _platform.bottom_y_anchor = _platform.y;
+    }
+
+    var _travel = 64;
+    if (variable_instance_exists(_platform, "platform_travel_px")) {
+        _travel = variable_instance_get(_platform, "platform_travel_px");
+    } else if (variable_instance_exists(_platform, "move_height")) {
+        _travel = variable_instance_get(_platform, "move_height");
+    }
+
+    var _speed = 0.5;
+    if (variable_instance_exists(_platform, "platform_move_speed")) {
+        _speed = variable_instance_get(_platform, "platform_move_speed");
+    } else if (variable_instance_exists(_platform, "move_speed")) {
+        _speed = variable_instance_get(_platform, "move_speed");
+    }
+
+    var _pause_sec = 3;
+    if (variable_instance_exists(_platform, "platform_pause_sec")) {
+        _pause_sec = variable_instance_get(_platform, "platform_pause_sec");
+    } else if (variable_instance_exists(_platform, "endpoint_pause_seconds")) {
+        _pause_sec = variable_instance_get(_platform, "endpoint_pause_seconds");
+    }
+
+    var _start_up = true;
+    if (variable_instance_exists(_platform, "platform_starts_going_up")) {
+        _start_up = variable_instance_get(_platform, "platform_starts_going_up");
+    } else if (variable_instance_exists(_platform, "start_direction")) {
+        _start_up = (variable_instance_get(_platform, "start_direction") < 0);
+    }
+
+    _platform.move_height = max(1, real(_travel));
+    _platform.move_speed = real(_speed);
+    _platform.start_direction = _start_up ? -1 : 1;
+    _platform.endpoint_pause_seconds = max(0, real(_pause_sec));
+    _platform.endpoint_pause_frames = round(_platform.endpoint_pause_seconds * game_get_speed(gamespeed_fps));
+    _platform.move_distance = _platform.move_height;
+
+    _platform.bottom_y = real(_platform.bottom_y_anchor);
+    _platform.top_y = _platform.bottom_y - _platform.move_height;
+    _platform.start_y = _platform.bottom_y;
+
+    if (_platform.start_direction > 0) {
+        _platform.y = _platform.top_y;
+        _platform.move_dir = 1;
+    } else {
+        _platform.y = _platform.bottom_y;
+        _platform.move_dir = -1;
+    }
+
+    with (_platform) {
+        _layout_applied = true;
+    }
+}
+
+
+/// @function platform_v_apply_layout(_platform)
+/// @description Alias for finalize (legacy calls).
+function platform_v_apply_layout(_platform) {
+    platform_v_finalize_config(_platform);
+}
+
+
+/// @function platform_apprentice_on_top(_apprentice, _platform)
+function platform_apprentice_on_top(_apprentice, _platform) {
+    if (!instance_exists(_apprentice) || !instance_exists(_platform)) return false;
+    if (!_platform.platform_active) return false;
+    return ( _apprentice.bbox_right >= _platform.bbox_left
+        && _apprentice.bbox_left <= _platform.bbox_right
+        && abs(_apprentice.bbox_bottom - _platform.bbox_top) <= 2);
+}
+
+
+/// @function platform_apprentice_riding(_apprentice)
+/// @description True while the apprentice is carried (auto-walk suppressed).
+function platform_apprentice_riding(_apprentice) {
+    if (!instance_exists(_apprentice)) return false;
+    var _plat = collision_rectangle(
+        _apprentice.bbox_left,
+        _apprentice.bbox_bottom,
+        _apprentice.bbox_right,
+        _apprentice.bbox_bottom + 2,
+        obj_platform_parent,
+        false,
+        true
+    );
+    if (_plat == noone || !_plat.platform_active) return false;
+
+    if (variable_instance_exists(_plat, "endpoint_wait") && (_plat.endpoint_wait > 0)) {
+        return false;
+    }
+
+    if (_plat.object_index == obj_platform_moving_v) {
+        return platform_has_aero_onboard(_plat);
+    }
+
+    if (_plat.object_index == obj_platform_moving_h) {
+        return platform_has_aero_onboard(_plat);
+    }
+
+    return false;
+}
+
+
+/// @function platform_has_aero_onboard(_platform)
+/// @description Moving platforms only run when an Aeromancer is standing on them (if requires_aero).
+function platform_has_aero_onboard(_platform) {
+    if (!instance_exists(_platform) || !_platform.platform_active) return false;
+    if (variable_instance_exists(_platform, "requires_aero") && !_platform.requires_aero) {
+        return true;
+    }
+
+    var _left = _platform.bbox_left;
+    var _right = _platform.bbox_right;
+    var _top = _platform.bbox_top;
+    var _found = false;
+
+    with (obj_apprentice) {
+        if (_found) continue;
+        if (role != ROLE.AERO) continue;
+        if ((state == AP_STATE.DEAD) || (state == AP_STATE.EXITED)) continue;
+        if ((bbox_right >= _left) && (bbox_left <= _right) && (abs(bbox_bottom - _top) <= 2)) {
+            _found = true;
+        }
+    }
+    return _found;
+}
+
+
 /// @function platform_carry_passengers(_platform, _dx, _dy)
 /// @description Move all apprentices standing on top of a platform by the given delta.
 ///              Call this AFTER moving the platform itself.

@@ -23,6 +23,15 @@ if (mouse_wheel_up() || keyboard_check_pressed(vk_add) || keyboard_check_pressed
 // Run the pixel-perfect camera update (lerp, snap, apply)
 camera_update();
 
+// Level preview start when legacy rooms have no UI controller
+if (!global.level_started && !instance_exists(obj_ui_controller)) {
+    if (mouse_check_button_pressed(mb_left)
+        || keyboard_check_pressed(vk_space)
+        || keyboard_check_pressed(vk_enter)) {
+        ui_start_level();
+    }
+}
+
 // --- Game Logic ---
 if (!counts_initialized) {
     apprentice_count = instance_number(obj_apprentice);

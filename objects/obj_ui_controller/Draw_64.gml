@@ -3,16 +3,45 @@
 /// All UI rendering happens here. GUI coords are 320×180.
 /// The UI only READS game state — never modifies it.
 
+ui_ensure_gui_size();
 draw_set_font(Font1);
+draw_set_alpha(1);
 
 var _controller = core_controller();
 var _gui_w = display_get_gui_width();
 var _gui_h = display_get_gui_height();
 
 // ============================================================================
+// LEVEL PREVIEW — click to begin spawning / movement
+// ============================================================================
+if (!global.level_started) {
+    draw_set_alpha(0.35);
+    draw_set_colour(c_black);
+    draw_rectangle(0, 0, _gui_w, _gui_h, false);
+    draw_set_alpha(1);
+    draw_set_colour(c_white);
+    draw_set_halign(fa_center);
+    draw_set_valign(fa_middle);
+    draw_text(_gui_w * 0.5, _gui_h * 0.5 - 6, "CLICK TO START");
+    draw_set_colour(make_colour_rgb(180, 180, 200));
+    draw_set_valign(fa_top);
+    draw_text(_gui_w * 0.5, _gui_h * 0.5 + 6, "Pan: WASD · Zoom: wheel");
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    exit;
+}
+
+// ============================================================================
 // HUD (always visible during gameplay and pause)
 // ============================================================================
 if (ui_state == UI_STATE.GAMEPLAY || ui_state == UI_STATE.PAUSED) {
+    
+    var _bar = ui_role_bar_layout();
+    var _bar_x = _bar.bar_x;
+    var _bar_y = _bar.bar_y;
+    var _btn_w = _bar.btn_w;
+    var _btn_h = _bar.btn_h;
+    var _btn_gap = _bar.btn_gap;
     
     // --- Top bar background ---
     draw_set_alpha(0.85);
@@ -21,12 +50,6 @@ if (ui_state == UI_STATE.GAMEPLAY || ui_state == UI_STATE.PAUSED) {
     draw_set_alpha(1);
     
     // --- Role buttons ---
-    var _bar_x = 4;
-    var _bar_y = 2;
-    var _btn_w = 36;
-    var _btn_h = 10;
-    var _btn_gap = 2;
-    
     for (var _role = ROLE.GEO; _role <= ROLE.AERO; ++_role) {
         var _index = _role - ROLE.GEO;
         var _bx = _bar_x + (_index * (_btn_w + _btn_gap));
@@ -47,7 +70,7 @@ if (ui_state == UI_STATE.GAMEPLAY || ui_state == UI_STATE.PAUSED) {
         draw_set_colour(_selected ? make_colour_rgb(18, 18, 32) : _role_colour);
         draw_set_halign(fa_center);
         draw_set_valign(fa_middle);
-        var _label = ui_get_role_name(_role) + " " + string(_index + 1);
+        var _label = ui_get_role_name(_role);
         draw_text(_bx + _btn_w * 0.5, _bar_y + _btn_h * 0.5, _label);
         
         // Budget indicator (if limited)
@@ -78,12 +101,13 @@ if (ui_state == UI_STATE.GAMEPLAY || ui_state == UI_STATE.PAUSED) {
         draw_text(4, 16, ui_get_role_tooltip(_controller.selected_role));
     }
     
-    // --- Paused indicator (below tooltip) ---
-    if (global.paused && ui_state == UI_STATE.GAMEPLAY) {
-        draw_set_halign(fa_right);
+    // --- Role assignment hint ---
+    if (instance_exists(_controller) && global.paused && ui_state == UI_STATE.GAMEPLAY
+        && (_controller.selected_role != ROLE.NONE)) {
+        draw_set_halign(fa_center);
         draw_set_valign(fa_top);
-        draw_set_colour(c_white);
-        draw_text(_gui_w - 4, 16, "PAUSED");
+        draw_set_colour(make_colour_rgb(200, 200, 255));
+        draw_text(_gui_w * 0.5, 16, "Click apprentice · Esc or click void to cancel");
     }
     
     // --- Tutorial hint ---

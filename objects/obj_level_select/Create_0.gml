@@ -8,18 +8,20 @@ grid_cols = 5;
 grid_rows = 8;
 total_levels = grid_cols * grid_rows;  // 40 levels
 
-// Grid positioning (centered in 320x180)
-grid_start_x = 40;
-grid_start_y = 24;
-cell_w = 44;
-cell_h = 18;
+// Back button
+back_selected = false;
 
-// Level unlock state (for now, only level 1 is unlocked)
-levels_unlocked = 1;
+// Layout tuned for 320×180 dark UI panel
+grid_start_x = 36;
+grid_start_y = 28;
+cell_w = 44;
+cell_h = 16;
+
+// Level unlock state (for now, first N levels in level_rooms are selectable)
+levels_unlocked = 4;
 
 // Room list — map level index to actual room asset
-// Add rooms here as you create them
-level_rooms = [Room1, Room2];
+level_rooms = [Room1, lvl_geo, lvl_cryo, lvl_aero];
 
 // Cursor / selection
 cursor_index = 0;

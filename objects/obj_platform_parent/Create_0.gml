@@ -6,6 +6,8 @@
 ///
 /// PUBLIC VARIABLES:
 ///   platform_active : bool — Whether the platform is currently functional.
+///   platform_width  : real — World width in pixels (from room scale or creation code).
+///   platform_height : real — World height in pixels.
 ///
 /// PUBLIC METHODS (override in children):
 ///   None at parent level — children implement their own movement.
@@ -21,3 +23,7 @@
 ///   Adding a new platform type = new child object, zero changes elsewhere.
 
 platform_active = true;
+platform_width = 0;
+platform_height = 0;
+requires_aero = true;
+platform_sync_size_from_room();

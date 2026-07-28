@@ -66,7 +66,7 @@ function signal_emit(_channel, _value) {
             var _inst = _listener.instance;
             if (variable_instance_exists(_inst, _listener.callback)) {
                 var _method = variable_instance_get(_inst, _listener.callback);
-                _method(_value);
+                method(_inst, _method)(_value);
             }
             array_push(_clean_list, _listener);
         }

@@ -51,7 +51,7 @@ if (mouse_check_button_pressed(mb_left)) {
     
     // Check back button
     var _back_x = 120;
-    var _back_y = 166;
+    var _back_y = 164;
     var _back_w = 80;
     var _back_h = 12;
     if (point_in_rectangle(mouse_x, mouse_y, _back_x, _back_y, _back_x + _back_w, _back_y + _back_h)) {

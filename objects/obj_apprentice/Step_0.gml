@@ -36,11 +36,12 @@ switch (state) {
             }
         }
 
-        var _hazard = core_hazard_ahead(id, global.core_config.detection_distance);
+        var _look_ahead = core_hazard_detection_distance(id);
+        var _hazard = core_hazard_ahead(id, _look_ahead);
         if (_hazard != noone) {
             if (capability_has(id, CAP.VOIDWALK) && core_is_gap_hazard(_hazard)
                 && core_gap_can_clear(id, _hazard)
-                && core_gap_ahead_in_range(id, _hazard, global.core_config.detection_distance)) {
+                && core_gap_ahead_in_range(id, _hazard, _look_ahead)) {
                 gap_jump_target = _hazard;
             } else if (core_is_gap_hazard(_hazard)) {
                 gap_jump_target = noone;
@@ -76,19 +77,22 @@ switch (state) {
             gap_jump_target = noone;
         }
 
-        h_remainder += move_speed * move_sign;
-        var _horizontal_pixels = floor(abs(h_remainder));
-        if (_horizontal_pixels > 0) {
-            h_remainder -= _horizontal_pixels * sign(h_remainder);
-            repeat (_horizontal_pixels) {
-                if (core_apprentice_collides(id, move_sign, 0)) {
-                    move_sign *= -1;
-                    h_remainder = 0;
-                    gap_jump_target = noone;
-                    break;
+        if (!platform_apprentice_riding(id)) {
+            h_remainder += move_speed * move_sign;
+            var _horizontal_pixels = floor(abs(h_remainder));
+            if (_horizontal_pixels > 0) {
+                h_remainder -= _horizontal_pixels * sign(h_remainder);
+                repeat (_horizontal_pixels) {
+                    if (core_apprentice_collides(id, move_sign, 0)) {
+                        core_apprentice_bounce_horizontal(id);
+                        break;
+                    }
+                    x += move_sign;
+                    core_apprentice_set_facing(id, move_sign);
                 }
-                x += move_sign;
             }
+        } else {
+            h_remainder = 0;
         }
 
         if (instance_exists(gap_jump_target) && core_gap_jumpable(id, gap_jump_target)) {
@@ -97,6 +101,9 @@ switch (state) {
                 exit;
             }
         }
+
+        var _ladder = core_ladder_touching(id);
+        if (_ladder != noone) core_try_mount_ladder(id, _ladder);
         break;
 
     case AP_STATE.CASTING:
@@ -107,9 +114,13 @@ switch (state) {
     case AP_STATE.GAP_JUMP:
         core_step_gap_jump(id);
         break;
+
+    case AP_STATE.CLIMBING:
+        core_step_climb(id);
+        break;
 }
 
-if (state != AP_STATE.CASTING && state != AP_STATE.GAP_JUMP) {
+if (state != AP_STATE.CASTING && state != AP_STATE.GAP_JUMP && state != AP_STATE.CLIMBING) {
     v_speed = min(v_speed + global.core_config.gravity, global.core_config.max_fall_speed);
     v_remainder += v_speed;
     var _vertical_pixels = floor(abs(v_remainder));
@@ -129,7 +140,7 @@ if (state != AP_STATE.CASTING && state != AP_STATE.GAP_JUMP) {
 
 if (core_try_exit(id)) exit;
 
-if (state != AP_STATE.CASTING && state != AP_STATE.GAP_JUMP) {
+if (state != AP_STATE.CASTING && state != AP_STATE.GAP_JUMP && state != AP_STATE.CLIMBING) {
     core_resolve_hazard_contact(id);
 }
 

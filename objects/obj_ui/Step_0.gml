@@ -2,6 +2,8 @@ var _controller = core_controller();
 if (!instance_exists(_controller)) exit;
 if (_controller.level_state != LEVEL_STATE.PLAYING) exit;
 
+if (!global.level_started) exit;
+
 var _chosen = ROLE.NONE;
 if (keyboard_check_pressed(ord("1"))) _chosen = ROLE.GEO;
 if (keyboard_check_pressed(ord("2"))) _chosen = ROLE.CRYO;

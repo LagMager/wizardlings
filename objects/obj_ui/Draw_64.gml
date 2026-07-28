@@ -4,7 +4,7 @@ draw_set_colour(make_colour_rgb(18, 18, 32));
 draw_rectangle(0, 0, display_get_gui_width(), 64, false);
 draw_set_alpha(1);
 
-var _labels = ["GEO [1]", "CRYO [2]", "AEGI [3]", "AERO [4]"];
+var _labels = ["GEO", "CRYO", "AEGI", "AERO"];
 var _colours = [
     make_colour_rgb(126, 190, 72),
     make_colour_rgb(92, 220, 255),

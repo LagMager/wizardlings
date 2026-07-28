@@ -1,11 +1,7 @@
-/// @description Vertical Moving Platform
-///
-/// PURPOSE: A platform that moves up and down vertically.
-/// PARENT: obj_platform_parent
+/// @description Vertical Moving Platform — configure in Instance Creation Code (see below)
 
 event_inherited();
 
-move_distance = 64;
-move_speed = 0.5;
-start_y = y;
-move_dir = -1;  // Start moving up
+bottom_y_anchor = y;
+endpoint_wait = 0;
+_layout_applied = false;

@@ -1,6 +1,7 @@
 /// @description Horizontal Moving Platform — Movement
 
 if (global.paused || !platform_active) exit;
+if (!platform_has_aero_onboard(id)) exit;
 
 var _old_x = x;
 

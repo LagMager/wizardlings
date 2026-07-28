@@ -10,8 +10,11 @@ if (!is_triggered && !is_falling) {
         obj_apprentice, false, true
     );
     if (_rider != noone) {
-        is_triggered = true;
-        fall_timer = fall_delay;
+        var _aero_ok = (!requires_aero) || (_rider.role == ROLE.AERO);
+        if (_aero_ok) {
+            is_triggered = true;
+            fall_timer = fall_delay;
+        }
     }
 }
 
@@ -25,6 +28,7 @@ if (is_triggered && !is_falling) {
 
 // Fall
 if (is_falling) {
+    if (!platform_has_aero_onboard(id)) exit;
     var _old_y = y;
     fall_speed += fall_gravity;
     y += fall_speed;

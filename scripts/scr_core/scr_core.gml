@@ -2,6 +2,7 @@ enum AP_STATE {
     WALKING,
     CASTING,
     GAP_JUMP,
+    CLIMBING,
     DEAD,
     EXITED,
     COUNT
@@ -48,7 +49,8 @@ function core_default_config() {
         max_fall_speed: 7,
         cast_duration: 30,
         detection_distance: 112,
-        wind_detection_distance: 128,
+        hazard_detection_distance: 48,
+        wind_detection_distance: 40,
         terrain_height: 16,
         ice_lifetime: 360,
         barrier_radius: 40,
@@ -59,6 +61,7 @@ function core_default_config() {
         gap_jump_duration: 28,
         gap_jump_height: 22,
         gap_jump_edge_tolerance: 4,
+        ladder_climb_speed: 1,
         debug_validation_period: 300
     };
 }
@@ -68,6 +71,12 @@ function core_controller() {
         return instance_find(obj_game_controller, 0);
     }
     return noone;
+}
+
+function core_environment_layer() {
+    /// Layer for spawned ice, bridges, etc. Falls back to Instances if the env layer is missing.
+    if (layer_exists("instances_environment")) return "instances_environment";
+    return "Instances";
 }
 
 function core_debug_check(_name, _condition) {
@@ -103,12 +112,85 @@ function core_rect_hits_tilemap(_left, _top, _right, _bottom) {
     return false;
 }
 
+function core_rect_hits_tilemap_horizontal(_left, _right, _foot_bottom) {
+    if (!variable_global_exists("collision_tilemap")) return false;
+    var _tilemap = global.collision_tilemap;
+    if (_tilemap == -1) return false;
+
+    var _step = global.core_config.tile_size;
+    for (var _row = 0; _row <= 1; ++_row) {
+        var _y = _foot_bottom - (_row * _step);
+        if (core_tile_is_solid(_tilemap, _left, _y)) return true;
+        if (core_tile_is_solid(_tilemap, _right, _y)) return true;
+    }
+    return false;
+}
+
+function core_apprentice_has_floor_support(_apprentice) {
+    var _left = _apprentice.bbox_left;
+    var _right = _apprentice.bbox_right - 1;
+    var _top = _apprentice.bbox_top;
+    var _bottom = _apprentice.bbox_bottom;
+    var _probe_bottom = _bottom + 1;
+    if (core_rect_hits_tilemap(_left, _top, _right, _probe_bottom)) return true;
+    return core_rect_hits_instances(_left, _top, _right, _probe_bottom);
+}
+
+function core_is_frozen_water(_water) {
+    if (!instance_exists(_water)) return false;
+    if ((_water.object_index != obj_hazard_water)
+        && !object_is_ancestor(_water.object_index, obj_hazard_water)) return false;
+    return variable_instance_exists(_water, "is_neutralized")
+        && _water.is_neutralized
+        && variable_instance_exists(_water, "hazard_active")
+        && !_water.hazard_active;
+}
+
+function core_frozen_water_walk_top(_water) {
+    return _water.bbox_top;
+}
+
+function core_rect_hits_frozen_water(_left, _top, _right, _bottom) {
+    var _count = instance_number(obj_hazard_water);
+    for (var _i = 0; _i < _count; ++_i) {
+        var _water = instance_find(obj_hazard_water, _i);
+        if (!core_is_frozen_water(_water)) continue;
+
+        var _strip_top = core_frozen_water_walk_top(_water);
+        var _strip_bottom = _strip_top + global.core_config.terrain_height - 1;
+        if ((_left <= _water.bbox_right)
+            && (_right >= _water.bbox_left)
+            && (_top <= _strip_bottom)
+            && (_bottom >= _strip_top)) return true;
+    }
+    return false;
+}
+
+function core_rect_hits_ladder_tops(_left, _top, _right, _bottom) {
+    var _count = instance_number(obj_ladder);
+    for (var _i = 0; _i < _count; ++_i) {
+        var _ladder = instance_find(obj_ladder, _i);
+        var _strip_top = _ladder.bbox_top;
+        var _strip_bottom = _strip_top + global.core_config.terrain_height - 1;
+        if ((_left <= _ladder.bbox_right)
+            && (_right >= _ladder.bbox_left)
+            && (_top <= _strip_bottom)
+            && (_bottom >= _strip_top)) return true;
+    }
+    return false;
+}
+
 function core_rect_hits_instances(_left, _top, _right, _bottom) {
     if (collision_rectangle(_left, _top, _right, _bottom, obj_terrain_block, false, true) != noone) return true;
+    if (core_rect_hits_frozen_water(_left, _top, _right, _bottom)) return true;
+    if (core_rect_hits_ladder_tops(_left, _top, _right, _bottom)) return true;
     if (collision_rectangle(_left, _top, _right, _bottom, obj_ice_platform, false, true) != noone) return true;
 
     var _wind = collision_rectangle(_left, _top, _right, _bottom, obj_wind_object, false, true);
     if ((_wind != noone) && _wind.solid_enabled) return true;
+
+    var _plat = collision_rectangle(_left, _top, _right, _bottom, obj_platform_parent, false, true);
+    if ((_plat != noone) && _plat.platform_active) return true;
     return false;
 }
 
@@ -122,7 +204,7 @@ function core_geo_build_bridge(_left, _top, _width, _source_hazard) {
     instance_create_layer(
         _left,
         _top,
-        "instances_environment",
+        core_environment_layer(),
         obj_terrain_block,
         {
             block_width: _width,
@@ -244,13 +326,48 @@ function core_step_gap_jump(_apprentice) {
     _apprentice.y = _base_y - (_apprentice.jump_peak * sin(pi * _u));
 }
 
+function core_hazard_detection_distance(_apprentice) {
+    if (instance_exists(_apprentice) && (_apprentice.role == ROLE.AERO)) {
+        return global.core_config.detection_distance;
+    }
+    return global.core_config.hazard_detection_distance;
+}
+
+function core_apprentice_nudge_inside_room(_apprentice) {
+    if (!instance_exists(_apprentice)) return;
+    if (_apprentice.bbox_left < 0) _apprentice.x -= _apprentice.bbox_left;
+    if (_apprentice.bbox_right >= room_width) {
+        _apprentice.x += (room_width - 1) - _apprentice.bbox_right;
+    }
+}
+
+function core_apprentice_bounce_horizontal(_apprentice) {
+    if (!instance_exists(_apprentice)) return;
+    _apprentice.move_sign *= -1;
+    _apprentice.h_remainder = 0;
+    _apprentice.gap_jump_target = noone;
+    core_apprentice_nudge_inside_room(_apprentice);
+    core_apprentice_set_facing(_apprentice, _apprentice.move_sign);
+}
+
 function core_apprentice_collides(_apprentice, _dx, _dy) {
     var _left = _apprentice.bbox_left + _dx;
     var _top = _apprentice.bbox_top + _dy;
     var _right = _apprentice.bbox_right + _dx - 1;
     var _bottom = _apprentice.bbox_bottom + _dy - 1;
 
-    if (core_rect_hits_tilemap(_left, _top, _right, _bottom)) return true;
+    if (_dx != 0) {
+        if (_left < 0 || _right >= room_width) return true;
+    }
+
+    if (_dx != 0 && _dy == 0) {
+        // Horizontal: skip tile side-walls when airborne (e.g. over obj_hazard_gap void).
+        if (core_apprentice_has_floor_support(_apprentice)) {
+            if (core_rect_hits_tilemap_horizontal(_left, _right, _bottom)) return true;
+        }
+    } else if (core_rect_hits_tilemap(_left, _top, _right, _bottom)) {
+        return true;
+    }
 
     // Instance masks use rectangle overlap semantics: anticipate support while
     // falling, but ignore the one-pixel support seam during horizontal motion.
@@ -312,8 +429,7 @@ function core_hazard_ahead(_apprentice, _distance) {
     );
     if (_legacy != noone) return _legacy;
     
-    // Check new typed hazards (obj_hazard_parent and all children)
-    return collision_rectangle(
+    var _hazard = collision_rectangle(
         _left,
         _apprentice.bbox_top - 8,
         _right,
@@ -322,6 +438,17 @@ function core_hazard_ahead(_apprentice, _distance) {
         false,
         true
     );
+    if (_hazard == noone) return noone;
+
+    if (core_is_gap_hazard(_hazard)
+        && variable_instance_exists(_hazard, "geo_resolved") && _hazard.geo_resolved
+        && (_apprentice.bbox_right >= _hazard.bbox_left)
+        && (_apprentice.bbox_left <= _hazard.bbox_right)
+        && core_apprentice_has_floor_support(_apprentice)) {
+        return noone;
+    }
+
+    return _hazard;
 }
 
 function core_wind_ahead(_apprentice, _distance) {
@@ -403,6 +530,169 @@ function core_wind_resolve_gap(_wind) {
     }
 }
 
+function core_hazard_contact_top(_hazard) {
+    if (!instance_exists(_hazard)) return 0;
+    if ((_hazard.object_index == obj_hazard_water)
+        || object_is_ancestor(_hazard.object_index, obj_hazard_water)) {
+        var _offset = 0;
+        if (variable_instance_exists(_hazard, "liquid_contact_top_offset")) {
+            _offset = _hazard.liquid_contact_top_offset;
+        } else {
+            var _h = _hazard.bbox_bottom - _hazard.bbox_top + 1;
+            _offset = floor(_h * 0.25);
+        }
+        return _hazard.bbox_top + _offset;
+    }
+    return _hazard.bbox_top;
+}
+
+function core_hazard_surface_y(_hazard) {
+    return core_hazard_contact_top(_hazard);
+}
+
+function core_hazard_contact_overlap(_apprentice, _hazard) {
+    if (!instance_exists(_apprentice) || !instance_exists(_hazard)) return false;
+    var _top = core_hazard_contact_top(_hazard);
+    return rectangle_in_rectangle(
+        _apprentice.bbox_left,
+        _apprentice.bbox_top,
+        _apprentice.bbox_right,
+        _apprentice.bbox_bottom,
+        _hazard.bbox_left,
+        _top,
+        _hazard.bbox_right,
+        _hazard.bbox_bottom
+    );
+}
+
+function core_apprentice_standing_on_ice(_apprentice) {
+    if (!instance_exists(_apprentice)) return noone;
+    var _ice = collision_rectangle(
+        _apprentice.bbox_left,
+        _apprentice.bbox_bottom,
+        _apprentice.bbox_right,
+        _apprentice.bbox_bottom + 2,
+        obj_ice_platform,
+        false,
+        true
+    );
+    if (_ice == noone) return noone;
+    if (abs(_apprentice.bbox_bottom - _ice.bbox_top) > 3) return noone;
+    return _ice;
+}
+
+function core_apprentice_standing_on_frozen_water(_apprentice) {
+    if (!instance_exists(_apprentice)) return noone;
+
+    var _count = instance_number(obj_hazard_water);
+    for (var _i = 0; _i < _count; ++_i) {
+        var _water = instance_find(obj_hazard_water, _i);
+        if (!core_is_frozen_water(_water)) continue;
+
+        var _top = core_frozen_water_walk_top(_water);
+        if (abs(_apprentice.bbox_bottom - _top) > 3) continue;
+        if (_apprentice.bbox_right < _water.bbox_left) continue;
+        if (_apprentice.bbox_left > _water.bbox_right) continue;
+        return _water;
+    }
+    return noone;
+}
+
+function core_apprentice_supported_by_hazard(_apprentice, _hazard) {
+    if (!instance_exists(_apprentice) || !instance_exists(_hazard)) return false;
+
+    var _ice = core_apprentice_standing_on_ice(_apprentice);
+    if ((_ice != noone) && instance_exists(_ice.source_hazard) && (_ice.source_hazard == _hazard)) return true;
+
+    var _water = core_apprentice_standing_on_frozen_water(_apprentice);
+    return (_water == _hazard);
+}
+
+function core_apprentice_set_facing(_apprentice, _new_facing) {
+    if (!instance_exists(_apprentice)) return;
+    _new_facing = (_new_facing < 0) ? -1 : 1;
+    if (_new_facing == _apprentice.facing) return;
+    // spr_apprentice origin is feet-center (7, 15) so image_xscale flips in place.
+    _apprentice.facing = _new_facing;
+    _apprentice.image_xscale = _new_facing;
+    _apprentice.image_yscale = 1;
+}
+
+function core_snap_apprentice_to_ladder(_apprentice, _ladder) {
+    if (!instance_exists(_apprentice) || !instance_exists(_ladder)) return;
+    var _center_x = (_apprentice.bbox_left + _apprentice.bbox_right + 1) * 0.5;
+    var _ladder_center = (_ladder.bbox_left + _ladder.bbox_right + 1) * 0.5;
+    _apprentice.x += _ladder_center - _center_x;
+}
+
+function core_apprentice_overlaps_ladder_column(_apprentice, _ladder) {
+    return (_apprentice.bbox_right >= _ladder.bbox_left)
+        && (_apprentice.bbox_left <= _ladder.bbox_right);
+}
+
+function core_ladder_touching(_apprentice) {
+    var _count = instance_number(obj_ladder);
+    for (var _i = 0; _i < _count; ++_i) {
+        var _ladder = instance_find(obj_ladder, _i);
+        if (!core_apprentice_overlaps_ladder_column(_apprentice, _ladder)) continue;
+        if (_apprentice.bbox_top > _ladder.bbox_bottom + 2) continue;
+        if (_apprentice.bbox_bottom < _ladder.bbox_top - 8) continue;
+        return _ladder;
+    }
+    return noone;
+}
+
+function core_try_mount_ladder(_apprentice, _ladder) {
+    if (!instance_exists(_apprentice) || !instance_exists(_ladder)) return false;
+    if (_apprentice.state != AP_STATE.WALKING) return false;
+    if (!core_apprentice_overlaps_ladder_column(_apprentice, _ladder)) return false;
+
+    var _on_top = abs(_apprentice.bbox_bottom - _ladder.bbox_top) <= 3;
+    if (_on_top) return false;
+
+    if (!core_apprentice_collides(_apprentice, 0, 1)) return false;
+    if (_apprentice.bbox_bottom <= _ladder.bbox_top + 4) return false;
+
+    _apprentice.climb_dir = 1;
+    core_snap_apprentice_to_ladder(_apprentice, _ladder);
+    core_apprentice_set_facing(_apprentice, 1);
+    _apprentice.state = AP_STATE.CLIMBING;
+    _apprentice.climb_ladder = _ladder;
+    _apprentice.v_speed = 0;
+    _apprentice.v_remainder = 0;
+    _apprentice.h_remainder = 0;
+    return true;
+}
+
+function core_step_climb(_apprentice) {
+    if (_apprentice.state != AP_STATE.CLIMBING) return;
+    if (!instance_exists(_apprentice.climb_ladder)) {
+        _apprentice.state = AP_STATE.WALKING;
+        _apprentice.climb_ladder = noone;
+        _apprentice.climb_dir = 1;
+        return;
+    }
+
+    var _ladder = _apprentice.climb_ladder;
+    var _speed = global.core_config.ladder_climb_speed;
+    if (variable_instance_exists(_ladder, "climb_speed")) _speed = _ladder.climb_speed;
+
+    core_snap_apprentice_to_ladder(_apprentice, _ladder);
+
+    _apprentice.y -= _speed;
+
+    if (_apprentice.bbox_bottom <= _ladder.bbox_top + 1) {
+        var _foot = _apprentice.bbox_bottom - _apprentice.y;
+        _apprentice.y = _ladder.bbox_top - _foot;
+        _apprentice.state = AP_STATE.WALKING;
+        _apprentice.climb_ladder = noone;
+        _apprentice.climb_dir = 1;
+        _apprentice.v_speed = 0;
+        _apprentice.v_remainder = 0;
+        core_apprentice_set_facing(_apprentice, _apprentice.move_sign);
+    }
+}
+
 function core_hazard_touching(_apprentice) {
     // Check legacy hazards
     var _legacy = collision_rectangle(
@@ -417,7 +707,7 @@ function core_hazard_touching(_apprentice) {
     if (_legacy != noone) return _legacy;
     
     // Check new typed hazards
-    return collision_rectangle(
+    var _hazard = collision_rectangle(
         _apprentice.bbox_left,
         _apprentice.bbox_top,
         _apprentice.bbox_right,
@@ -426,6 +716,13 @@ function core_hazard_touching(_apprentice) {
         false,
         true
     );
+    if (_hazard == noone) return noone;
+
+    if ((_hazard.object_index == obj_hazard_water)
+        || object_is_ancestor(_hazard.object_index, obj_hazard_water)) {
+        if (!core_hazard_contact_overlap(_apprentice, _hazard)) return noone;
+    }
+    return _hazard;
 }
 
 function core_exit_touching(_apprentice) {
@@ -459,6 +756,7 @@ function core_begin_cast(_apprentice, _target, _action) {
     if (!instance_exists(_apprentice)) return false;
     if ((_apprentice.state == AP_STATE.DEAD) || (_apprentice.state == AP_STATE.EXITED)) return false;
     if (_apprentice.state == AP_STATE.CASTING) return false;
+    if (_apprentice.state == AP_STATE.CLIMBING) return false;
 
     _apprentice.state = AP_STATE.CASTING;
     _apprentice.cast_target = _target;
@@ -511,7 +809,7 @@ function core_finish_cast(_apprentice) {
                         instance_create_layer(
                             _target.bbox_left,
                             _target.surface_y,
-                            "instances_environment",
+                            core_environment_layer(),
                             obj_ice_platform,
                             {
                                 platform_width: _ice_width,
@@ -607,6 +905,7 @@ function core_resolve_hazard_contact(_apprentice) {
         _apprentice.contact_hazard = noone;
         return;
     }
+    if (core_apprentice_supported_by_hazard(_apprentice, _hazard)) return;
     if ((_apprentice.state == AP_STATE.GAP_JUMP) && instance_exists(_apprentice.jump_gap) && (_hazard == _apprentice.jump_gap)) {
         return;
     }
@@ -636,7 +935,7 @@ function core_assign_role(_controller, _apprentice, _role) {
         instance_create_layer(
             _apprentice.x + 8,
             _apprentice.y + 8,
-            "instances_environment",
+            core_environment_layer(),
             obj_barrier_zone,
             { owner: _apprentice }
         );
@@ -722,7 +1021,7 @@ function core_run_boot_checks() {
     var _solid = tilemap_get_at_pixel(global.collision_tilemap, 80, 448);
     core_debug_check("solid tile reports data", (_solid != 0) && (_solid != -1));
     core_debug_check("invalid tilemap handle rejected", !core_tile_is_solid(-1, 80, 448));
-    core_debug_check("state enum contract", (AP_STATE.WALKING == 0) && (AP_STATE.COUNT == 5));
+    core_debug_check("state enum contract", (AP_STATE.WALKING == 0) && (AP_STATE.COUNT == 6));
     core_debug_check("exactly four assignable roles", (ROLE.COUNT - 1) == 4);
     core_debug_check("five hazard categories", HAZARD_TYPE.COUNT == 5);
     core_debug_check("movement config valid", (global.core_config.move_speed > 0) && (global.core_config.gravity > 0));

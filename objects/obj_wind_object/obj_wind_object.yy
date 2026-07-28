@@ -4,12 +4,15 @@
   "eventList":[
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":0,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
     {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":3,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
-    {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":8,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",}
+    {"$GMEvent":"v1","%Name":"","collisionObjectId":null,"eventNum":0,"eventType":8,"isDnD":false,"name":"","resourceType":"GMEvent","resourceVersion":"2.0",},
   ],
   "managed":true,
   "name":"obj_wind_object",
   "overriddenProperties":[],
-  "parent":{"name":"Wizardlings","path":"Wizardlings.yyp",},
+  "parent":{
+    "name":"Wizardlings",
+    "path":"Wizardlings.yyp",
+  },
   "parentObjectId":null,
   "persistent":false,
   "physicsAngularDamping":0.1,
@@ -28,7 +31,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":true,
-  "spriteId":{"name":"spr_apprentice","path":"sprites/spr_apprentice/spr_apprentice.yy",},
+  "spriteId":{
+    "name":"Sprite4",
+    "path":"sprites/Sprite4/Sprite4.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }

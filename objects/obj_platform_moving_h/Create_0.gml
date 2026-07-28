@@ -12,7 +12,7 @@
 ///   Moves itself, then calls platform_carry_passengers() to move riders.
 ///   Apprentices don't need to know this is a moving platform.
 
-event_inherited();  // Call parent Create
+event_inherited();
 
 move_distance = 64;
 move_speed = 0.5;

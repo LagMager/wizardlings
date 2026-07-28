@@ -34,7 +34,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":null,
+  "spriteId":{
+    "name":"spr_interactable_button",
+    "path":"sprites/spr_interactable_button/spr_interactable_button.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }

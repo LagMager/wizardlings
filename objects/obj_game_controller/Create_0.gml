@@ -18,7 +18,8 @@ cam_snap_to_pixel = true;   // Round camera position to whole pixels
 camera_init();
 
 global.core_config = core_default_config();
-global.paused = false;
+global.level_started = false;
+global.paused = true;
 global.collision_tilemap = -1;
 
 // Initialize the signal system for interactable→mechanism communication
@@ -47,6 +48,8 @@ smoke_pause_v = 0;
 if (smoke_mode) {
     if (!variable_global_exists("smoke_cycle")) global.smoke_cycle = 0;
     game_set_speed(600, gamespeed_fps);
+    global.level_started = true;
+    global.paused = false;
 }
 
 global.collision_tilemap = core_setup_collision_tilemap();

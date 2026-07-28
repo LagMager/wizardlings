@@ -57,6 +57,9 @@ function camera_init() {
     // Views must be on for the camera to take effect.
     view_enabled = true;
     view_visible[0] = true;
+
+    // Keep GUI aligned with base resolution after view/surface changes.
+    display_set_gui_size(cam_base_w, cam_base_h);
 }
 
 
@@ -111,6 +114,8 @@ function camera_update() {
     // --- Apply to camera ---
     camera_set_view_pos(_cam, cam_x, cam_y);
     camera_set_view_size(_cam, _view_w, _view_h);
+
+    display_set_gui_size(cam_base_w, cam_base_h);
 }
 
 

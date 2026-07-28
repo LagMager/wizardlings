@@ -1,7 +1,19 @@
 /// @description UI Controller — Input & State Management
 
+ui_ensure_gui_size();
+
 var _controller = core_controller();
 if (!instance_exists(_controller)) exit;
+
+// --- Level preview: frozen until player starts (camera still works) ---
+if (!global.level_started) {
+    if (mouse_check_button_pressed(mb_left)
+        || keyboard_check_pressed(vk_space)
+        || keyboard_check_pressed(vk_enter)) {
+        ui_start_level();
+    }
+    exit;
+}
 
 // --- Track level time while playing ---
 if (ui_state == UI_STATE.GAMEPLAY && !global.paused) {
@@ -19,8 +31,20 @@ if (_controller.level_state == LEVEL_STATE.LOST && ui_state != UI_STATE.DEFEAT) 
 // --- Input handling per UI state ---
 switch (ui_state) {
     case UI_STATE.GAMEPLAY:
-        // Pause toggle
+        // Cancel role pick before opening pause menu
+        if (global.paused && (_controller.selected_role != ROLE.NONE)) {
+            if (keyboard_check_pressed(vk_escape) || keyboard_check_pressed(mb_right)) {
+                ui_cancel_role_assignment(_controller);
+                exit;
+            }
+        }
+
+        // Pause toggle (not while picking a role — Esc cancels pick instead)
         if (keyboard_check_pressed(vk_escape) || keyboard_check_pressed(ord("P"))) {
+            if (global.paused && (_controller.selected_role != ROLE.NONE)) {
+                ui_cancel_role_assignment(_controller);
+                exit;
+            }
             ui_state = UI_STATE.PAUSED;
             global.paused = true;
             pause_cursor = 0;
@@ -38,20 +62,7 @@ switch (ui_state) {
         if (mouse_check_button_pressed(mb_left)) {
             var _mx = device_mouse_x_to_gui(0);
             var _my = device_mouse_y_to_gui(0);
-            var _bar_x = 4;
-            var _bar_y = 2;
-            var _btn_w = 36;
-            var _btn_h = 10;
-            var _btn_gap = 2;
-            
-            for (var _role = ROLE.GEO; _role <= ROLE.AERO; ++_role) {
-                if (!roles_enabled[_role]) continue;
-                var _index = _role - ROLE.GEO;
-                var _bx = _bar_x + (_index * (_btn_w + _btn_gap));
-                if (point_in_rectangle(_mx, _my, _bx, _bar_y, _bx + _btn_w, _bar_y + _btn_h)) {
-                    _chosen = _role;
-                }
-            }
+            _chosen = ui_role_at_gui_point(_mx, _my);
         }
         
         if (_chosen != ROLE.NONE) {
@@ -64,7 +75,15 @@ switch (ui_state) {
         // Click apprentice to assign (while paused with role selected)
         if (global.paused && (_controller.selected_role != ROLE.NONE) && mouse_check_button_pressed(mb_left)) {
             var _target = instance_position(mouse_x, mouse_y, obj_apprentice);
-            if (_target != noone) core_assign_role(_controller, _target, _controller.selected_role);
+            if (_target != noone) {
+                core_assign_role(_controller, _target, _controller.selected_role);
+            } else {
+                var _mx = device_mouse_x_to_gui(0);
+                var _my = device_mouse_y_to_gui(0);
+                if (ui_role_at_gui_point(_mx, _my) == ROLE.NONE) {
+                    ui_cancel_role_assignment(_controller);
+                }
+            }
         }
         break;
         
