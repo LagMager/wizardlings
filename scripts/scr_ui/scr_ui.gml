@@ -60,17 +60,6 @@ function ui_start_level() {
     global.paused = false;
 }
 
-// Role tooltip descriptions
-function ui_get_role_tooltip(_role) {
-    switch (_role) {
-        case ROLE.GEO:  return "Builds bridges over gaps and spikes";
-        case ROLE.CRYO: return "Freezes water and extinguishes fire";
-        case ROLE.AEGI: return "Projects a barrier (absorbs 2 hits)";
-        case ROLE.AERO: return "Leaps gaps and controls wind platforms";
-        default:        return "";
-    }
-}
-
 // Role display names
 function ui_get_role_name(_role) {
     switch (_role) {

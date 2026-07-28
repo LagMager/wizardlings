@@ -93,14 +93,6 @@ if (ui_state == UI_STATE.GAMEPLAY || ui_state == UI_STATE.PAUSED) {
         draw_text(_gui_w - 4, 7, _status);
     }
     
-    // --- Tooltip for selected role ---
-    if (instance_exists(_controller) && _controller.selected_role != ROLE.NONE) {
-        draw_set_halign(fa_left);
-        draw_set_valign(fa_top);
-        draw_set_colour(ui_get_role_colour(_controller.selected_role));
-        draw_text(4, 16, ui_get_role_tooltip(_controller.selected_role));
-    }
-    
     // --- Role assignment hint ---
     if (instance_exists(_controller) && global.paused && ui_state == UI_STATE.GAMEPLAY
         && (_controller.selected_role != ROLE.NONE)) {

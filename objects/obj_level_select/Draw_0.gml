@@ -31,10 +31,6 @@ draw_set_halign(fa_center);
 draw_set_valign(fa_top);
 draw_text(160, 14, "LEVELS");
 
-draw_set_colour(_text_muted);
-draw_set_valign(fa_middle);
-draw_text(160, 22, string(levels_unlocked) + " / " + string(total_levels));
-
 // Level grid
 for (var _i = 0; _i < total_levels; _i++) {
     var _col = _i mod grid_cols;
@@ -47,7 +43,8 @@ for (var _i = 0; _i < total_levels; _i++) {
     var _btn_x2 = _cx + cell_w - 6;
     var _btn_y2 = _cy + cell_h - 3;
 
-    var _unlocked = (_i < levels_unlocked);
+    var _has_level = (_i < array_length(level_rooms));
+    var _unlocked = _has_level && (_i < levels_unlocked);
     var _selected = (!back_selected && cursor_index == _i);
 
     draw_set_colour(_unlocked ? (_selected ? _cell_hi : _cell) : _locked);
@@ -69,7 +66,6 @@ for (var _i = 0; _i < total_levels; _i++) {
         draw_set_colour(_selected ? c_white : _text);
         draw_text(_mid_x, _mid_y, string(_i + 1));
     } else {
-        // Minimal lock (muted)
         draw_set_colour(_text_dim);
         draw_rectangle(_mid_x - 3, _mid_y, _mid_x + 3, _mid_y + 3, false);
         draw_rectangle(_mid_x - 2, _mid_y - 3, _mid_x + 2, _mid_y - 1, true);

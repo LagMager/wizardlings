@@ -1,9 +1,13 @@
-/// @description Draw spikes
+/// Tile spr_spikes at native size; scaleX/scaleY size the hazard bounds.
 if (is_neutralized) exit;
 
-draw_set_colour(make_colour_rgb(208, 214, 224));
-draw_rectangle(bbox_left, bbox_top + 12, bbox_right, bbox_bottom, false);
-for (var _sx = bbox_left; _sx < bbox_right; _sx += 8) {
-    draw_triangle(_sx, bbox_top + 12, _sx + 4, bbox_top, _sx + 8, bbox_top + 12, false);
+var _tile_w = sprite_get_width(sprite_index);
+var _tile_h = sprite_get_height(sprite_index);
+var _left = bbox_left;
+var _y = bbox_top;
+
+while (_left <= bbox_right) {
+    draw_sprite_stretched(sprite_index, image_index, _left, _y, _tile_w, _tile_h * image_yscale);
+    _left += _tile_w;
 }
 draw_set_colour(c_white);

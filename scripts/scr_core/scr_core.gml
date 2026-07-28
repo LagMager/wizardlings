@@ -395,7 +395,7 @@ function core_hazard_is_lethal(_hazard) {
 function core_role_counters_hazard(_role, _hazard_type) {
     switch (_role) {
         case ROLE.GEO:
-            return (_hazard_type == HAZARD_TYPE.GAP) || (_hazard_type == HAZARD_TYPE.SPIKES);
+            return (_hazard_type == HAZARD_TYPE.GAP);
         case ROLE.CRYO:
             return (_hazard_type == HAZARD_TYPE.LIQUID)
                 || (_hazard_type == HAZARD_TYPE.FIRE)

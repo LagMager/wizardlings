@@ -8,13 +8,16 @@
 ///   ladder_extend_speed    — 0–1 lerp per frame (default 0.06)
 
 image_speed = 0;
+if (!variable_global_exists("core_config")) {
+    global.core_config = core_default_config();
+}
 if (!variable_instance_exists(id, "climb_speed")) {
     climb_speed = global.core_config.ladder_climb_speed;
 }
 
 ladder_extend_channel = "";
 ladder_scale_y_start = image_yscale;
-ladder_scale_y_end = image_yscale;
+ladder_scale_y_end = 16;
 ladder_extend_speed = 0.06;
 ladder_extend_active = false;
 ladder_extend_t = 0;
